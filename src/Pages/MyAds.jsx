@@ -11,7 +11,7 @@ const AdImageComponent = ({ ad, getAdImage, getAdTitle }) => {
   const [currentImageUrl, setCurrentImageUrl] = useState(null);
   const [attemptCount, setAttemptCount] = useState(0);
   const imageUrl = getAdImage(ad);
-  const API_URL = server_ip || 'http://localhost:8001';
+  const API_URL = server_ip;
 
   useEffect(() => {
     // Reset error state when image URL changes
@@ -151,8 +151,40 @@ function MyAds() {
   const fetchUserAds = async (userId) => {
     try {
       setLoading(true);
-      const API_URL = server_ip || 'http://localhost:8001';
-      const response = await fetch(`${API_URL}/all_user_ads/${userId}`);
+      // FORCE 8001 - Standardize for connectivity
+      const API_URL = server_ip;
+      console.log(`📡 [FORCED FIX] Fetching user ads from: ${API_URL}`);
+
+      const fetchWithRetry = async (url, options = {}) => {
+        try {
+          const res = await fetch(url, {
+            ...options,
+            headers: {
+              ...options.headers,
+              'Content-Type': 'application/json'
+            },
+            mode: 'cors',
+            credentials: 'omit',
+          });
+          return res;
+        } catch (err) {
+          console.warn(`⚠️ Retrying fetch for ${url} (localhost fallback)`);
+          const fallbackUrl = url.includes('127.0.0.1')
+            ? url.replace('127.0.0.1', 'localhost')
+            : url.replace('localhost', '127.0.0.1');
+          return fetch(fallbackUrl, {
+            ...options,
+            headers: {
+              ...options.headers,
+              'Content-Type': 'application/json'
+            },
+            mode: 'cors',
+            credentials: 'omit',
+          });
+        }
+      };
+
+      const response = await fetchWithRetry(`${API_URL}/all_user_ads/${userId}`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch ads');
@@ -211,7 +243,7 @@ function MyAds() {
   const getAdImage = (ad) => {
     if (!ad) return null;
 
-    const API_URL = server_ip || 'http://localhost:8001';
+    const API_URL = server_ip;
 
     // Helper function to build image URL
     const buildImageUrl = (imagePath) => {
@@ -550,7 +582,38 @@ function MyAds() {
 
     try {
       setLoading(true);
-      const API_URL = server_ip || 'http://localhost:8001';
+      // FORCE 8001 - Standardize for connectivity
+      const API_URL = server_ip;
+      console.log(`📡 [FORCED FIX] Deleting ad from: ${API_URL}`);
+
+      const fetchWithRetry = async (url, options = {}) => {
+        try {
+          const res = await fetch(url, {
+            ...options,
+            headers: {
+              ...options.headers,
+              'Content-Type': 'application/json'
+            },
+            mode: 'cors',
+            credentials: 'omit',
+          });
+          return res;
+        } catch (err) {
+          console.warn(`⚠️ Retrying fetch for ${url} (localhost fallback)`);
+          const fallbackUrl = url.includes('127.0.0.1')
+            ? url.replace('127.0.0.1', 'localhost')
+            : url.replace('localhost', '127.0.0.1');
+          return fetch(fallbackUrl, {
+            ...options,
+            headers: {
+              ...options.headers,
+              'Content-Type': 'application/json'
+            },
+            mode: 'cors',
+            credentials: 'omit',
+          });
+        }
+      };
 
       // Determine the correct endpoint based on ad type
       let deleteEndpoint = '';
@@ -563,13 +626,8 @@ function MyAds() {
         deleteEndpoint = `${API_URL}/delete_ad/${ad._id}`;
       }
 
-      const response = await fetch(deleteEndpoint, {
+      const response = await fetchWithRetry(deleteEndpoint, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors',
-        credentials: 'omit',
       });
 
       if (!response.ok) {

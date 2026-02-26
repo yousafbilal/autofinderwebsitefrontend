@@ -147,178 +147,20 @@ function Header() {
         <title>Auto Finder - Car Dealership</title>
       </Helmet>
 
-      {/* Spacer to prevent content from jumping up due to fixed header */}
-      <div className="h-[65px] sm:h-[80px]"></div>
+      {/* Spacer to prevent content from jumping up due to fixed header - Hidden on Home page for seamless video */}
+      {/* Spacer to prevent content from jumping up due to fixed header - Hidden on Home page for seamless video */}
+      {location.pathname !== '/' && (
+        <div className="h-[40px] sm:h-[50px]"></div>
+      )}
 
       {/* Fixed Wrapper for Smart Header */}
       <div className={`fixed top-0 left-0 right-0 z-[100] transition-transform duration-300 ${isVisible ? 'translate-y-0' : '-translate-y-full'}`}>
-        {/* Top Bar - Download App & Sign Up/In */}
-        <div className="bg-gradient-to-r from-gray-800 to-gray-700 dark:from-gray-950 dark:to-gray-900 text-white dark:text-gray-100 py-1 text-xs sm:text-sm relative z-[101]">
-          <div className="container mx-auto px-2 sm:px-4">
-            <div className="flex items-center justify-between">
-              {/* Left Side - Download App */}
-              <div className="flex items-center gap-1 sm:gap-2">
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
-                <span>{t('downloadApp')}</span>
-              </div>
 
-
-
-              {/* Right Side - Sign Up/Sign In or User Menu */}
-              <div className="flex items-center gap-2 sm:gap-3 relative">
-                {/* User Section */}
-                {user ? (
-                  <div
-                    className="relative"
-                    ref={userMenuRef}
-                  >
-                    <button
-                      ref={userButtonRef}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleUserMenu();
-                      }}
-                      className="flex items-center gap-1 sm:gap-2 hover:text-red-400 transition-colors"
-                    >
-                      {getProfileImageUrl() ? (
-                        <img
-                          src={getProfileImageUrl()}
-                          alt={user.name || 'User'}
-                          className="w-6 h-6 sm:w-8 sm:h-8 rounded-full object-cover border-2 border-white dark:border-gray-700"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-red-600 dark:bg-red-700 flex items-center justify-center text-white font-semibold text-xs sm:text-sm">
-                          {(user.name || user.email || 'U').charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      <div className="flex items-center gap-1 sm:gap-2">
-                        <span className="text-xs sm:text-sm font-medium hidden md:inline">{user.name || user.email || 'User'}</span>
-                        {user.emailVerified && (
-                          <svg className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20" title="Verified Account">
-                            <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                        )}
-                      </div>
-                    </button>
-
-                    {/* User Dropdown Menu - Fixed positioning above navbar */}
-                    {isUserMenuOpen && (
-                      <div
-                        className="user-dropdown-menu fixed bg-white dark:bg-gray-800 shadow-2xl rounded-lg border border-gray-200 dark:border-gray-700 py-2 min-w-[200px]"
-                        style={{
-                          top: `${dropdownPosition.top}px`,
-                          right: `${dropdownPosition.right}px`,
-                          zIndex: 99999
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{user.name || 'User'}</p>
-                            {user.emailVerified && (
-                              <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" title="Verified Account">
-                                <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                              </svg>
-                            )}
-                          </div>
-                          {user.email ? (
-                            <a
-                              href={`https://mail.google.com/mail/u/0/?view=cm&to=${user.email}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-gray-500 dark:text-gray-400 truncate hover:text-red-600 transition-colors block cursor-pointer pointer-events-auto"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {user.email}
-                            </a>
-                          ) : (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.phone || ''}</p>
-                          )}
-                        </div>
-                        <Link
-                          to="/profile"
-                          className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsUserMenuOpen(false);
-                          }}
-                        >
-                          Profile
-                        </Link>
-                        <Link
-                          to="/my-ads"
-                          className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsUserMenuOpen(false);
-                          }}
-                        >
-                          My Ads
-                        </Link>
-                        <Link
-                          to="/my-packages"
-                          className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsUserMenuOpen(false);
-                          }}
-                        >
-                          My Packages
-                        </Link>
-                        <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleLogout();
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                        >
-                          Logout
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    <button
-                      onClick={toggleLanguage}
-                      className="hover:text-red-400 transition-colors text-xs sm:text-sm flex items-center gap-1"
-                    >
-                      <FaGlobe className="text-xs" />
-                      {language === 'en' ? 'اردو' : 'English'}
-                    </button>
-                    <span className="text-gray-400 hidden sm:inline">|</span>
-                    <Link
-                      to="/signup"
-                      className="hover:text-red-400 transition-colors text-xs sm:text-sm"
-                      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                    >
-                      {t('signUp')}
-                    </Link>
-                    <span className="text-gray-400 hidden sm:inline">|</span>
-                    <Link
-                      to="/signin"
-                      className="hover:text-red-400 transition-colors text-xs sm:text-sm"
-                      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                    >
-                      {t('signIn')}
-                    </Link>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Main Header - PakWheels Style */}
-        <header className="bg-white/80 dark:bg-gray-900/80 shadow-sm relative w-full border-b border-gray-200 dark:border-gray-700 backdrop-blur-md">
+        <header className="bg-white/80 dark:bg-gray-900/80 shadow-sm relative w-full backdrop-blur-md transition-all duration-300">
           <div className="container mx-auto px-2 sm:px-4">
-            <nav className="flex items-center justify-between py-0.5 sm:py-1" style={{ minHeight: '40px', maxHeight: '60px' }}>
+            <nav className="flex items-center justify-between py-0" style={{ minHeight: '30px', maxHeight: '45px' }}>
               {/* Logo Section */}
               <Link to="/" className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0" style={{ backgroundColor: 'transparent' }}>
                 <div className="relative flex items-center" style={{ backgroundColor: 'transparent', background: 'transparent' }}>
@@ -897,19 +739,30 @@ function Header() {
 
               {/* Post an Ad Button & Dark Mode Toggle */}
               <div className="hidden md:flex items-center gap-2 lg:gap-4">
+                {/* Language Switcher */}
+                <button
+                  onClick={toggleLanguage}
+                  className="text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-500 transition-colors px-2 py-1 text-xs font-semibold flex items-center gap-1 border-r border-gray-300 dark:border-gray-600 mr-1"
+                >
+                  <FaGlobe className="text-xs" />
+                  {language === 'en' ? 'اردو' : 'English'}
+                </button>
+
                 {/* Dark Mode Toggle Button */}
                 <button
                   onClick={toggleTheme}
-                  className="p-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  className="p-1 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                   aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
                   title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
                 >
                   {theme === 'dark' ? (
-                    <FaSun className="w-5 h-5 text-yellow-500" />
+                    <FaSun className="w-4 h-4 text-yellow-500" />
                   ) : (
-                    <FaMoon className="w-5 h-5" />
+                    <FaMoon className="w-4 h-4" />
                   )}
                 </button>
+
+                {/* User Section (Moved from Top Bar) */}
 
                 <div
                   className="relative"
@@ -917,17 +770,17 @@ function Header() {
                   onMouseEnter={() => setIsPostAdOpen(true)}
                   onMouseLeave={() => setIsPostAdOpen(false)}
                 >
-                  <button className="bg-red-600 hover:bg-red-700 text-white px-3 sm:px-4 lg:px-6 py-2 sm:py-2.5 rounded-md font-semibold text-xs sm:text-sm transition-colors shadow-sm whitespace-nowrap">
+                  <button className="bg-red-600 hover:bg-red-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-md font-semibold text-xs sm:text-sm transition-colors shadow-sm whitespace-nowrap">
                     {t('postAd')}
                   </button>
 
                   {/* Post an Ad Dropdown Menu */}
                   {isPostAdOpen && (
                     <div className="absolute top-full right-0 pt-2 bg-transparent z-50">
-                      <div className="bg-white dark:bg-gray-800 shadow-2xl rounded-lg border border-gray-200 dark:border-gray-700 py-2 min-w-[220px]">
+                      <div className="bg-white dark:bg-gray-800 shadow-xl rounded-md border border-gray-200 dark:border-gray-700 py-1 min-w-[160px]">
                         <Link
                           to="/sell-car"
-                          className="block px-6 py-3 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-red-600 dark:hover:text-red-500 transition-colors"
+                          className="block px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-red-600 dark:hover:text-red-500 transition-colors"
                           onClick={() => {
                             setIsPostAdOpen(false);
                             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -937,7 +790,7 @@ function Header() {
                         </Link>
                         <Link
                           to="/sell-bike"
-                          className="block px-6 py-3 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-red-600 dark:hover:text-red-500 transition-colors"
+                          className="block px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-red-600 dark:hover:text-red-500 transition-colors"
                           onClick={() => {
                             setIsPostAdOpen(false);
                             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -947,7 +800,7 @@ function Header() {
                         </Link>
                         <Link
                           to="/list-it-for-you"
-                          className="block px-6 py-3 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-red-600 dark:hover:text-red-500 transition-colors"
+                          className="block px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-red-600 dark:hover:text-red-500 transition-colors"
                           onClick={() => {
                             setIsPostAdOpen(false);
                             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -957,7 +810,7 @@ function Header() {
                         </Link>
                         <Link
                           to="/post-rent-car"
-                          className="block px-6 py-3 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-red-600 dark:hover:text-red-500 transition-colors"
+                          className="block px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-red-600 dark:hover:text-red-500 transition-colors"
                           onClick={() => {
                             setIsPostAdOpen(false);
                             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -967,7 +820,7 @@ function Header() {
                         </Link>
                         <Link
                           to="/buy-car-for-me"
-                          className="block px-6 py-3 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-red-600 dark:hover:text-red-500 transition-colors"
+                          className="block px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-red-600 dark:hover:text-red-500 transition-colors"
                           onClick={() => {
                             setIsPostAdOpen(false);
                             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -977,7 +830,7 @@ function Header() {
                         </Link>
                         <Link
                           to="/sell-car-parts"
-                          className="block px-6 py-3 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-red-600 dark:hover:text-red-500 transition-colors"
+                          className="block px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-red-600 dark:hover:text-red-500 transition-colors"
                           onClick={() => {
                             setIsPostAdOpen(false);
                             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -987,7 +840,7 @@ function Header() {
                         </Link>
                         <Link
                           to="/inspection"
-                          className="block px-6 py-3 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-red-600 dark:hover:text-red-500 transition-colors"
+                          className="block px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-red-600 dark:hover:text-red-500 transition-colors"
                           onClick={() => {
                             setIsPostAdOpen(false);
                             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -999,6 +852,146 @@ function Header() {
                     </div>
                   )}
                 </div>
+
+                {/* User Section (Moved to the end for right corner placement) */}
+                {user ? (
+                  <div
+                    className="relative"
+                    ref={userMenuRef}
+                    onMouseEnter={() => {
+                      setIsUserMenuOpen(true);
+                      // Trigger position update for dropdown if needed by the component logic
+                      if (userButtonRef.current) {
+                        const rect = userButtonRef.current.getBoundingClientRect();
+                        setDropdownPosition({
+                          top: rect.bottom,
+                          right: window.innerWidth - rect.right
+                        });
+                      }
+                    }}
+                    onMouseLeave={() => setIsUserMenuOpen(false)}
+                  >
+                    <button
+                      ref={userButtonRef}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Still allow clicking to toggle for mobile/touch
+                        toggleUserMenu();
+                      }}
+                      className="flex items-center hover:opacity-80 transition-opacity ml-1 py-1"
+                    >
+                      {getProfileImageUrl() ? (
+                        <img
+                          src={getProfileImageUrl()}
+                          alt={user.name || 'User'}
+                          className="w-6 h-6 sm:w-7 sm:h-7 rounded-full object-cover border-2 border-red-600 dark:border-red-500"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-red-600 dark:bg-red-700 flex items-center justify-center text-white font-bold text-[10px] sm:text-xs">
+                          {(user.name || user.email || 'U').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </button>
+
+                    {/* User Dropdown Menu */}
+                    {isUserMenuOpen && (
+                      <div
+                        className="user-dropdown-menu fixed bg-white dark:bg-gray-800 shadow-xl rounded-md border border-gray-200 dark:border-gray-700 py-1 min-w-[160px]"
+                        style={{
+                          top: `${dropdownPosition.top}px`,
+                          right: `${dropdownPosition.right}px`,
+                          zIndex: 99999
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="px-3 py-1.5 border-b border-gray-200 dark:border-gray-700">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">{user.name || 'User'}</p>
+                            {user.emailVerified && (
+                              <svg className="w-3 H-3 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" title="Verified Account">
+                                <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                          </div>
+                          {user.email ? (
+                            <a
+                              href={`https://mail.google.com/mail/u/0/?view=cm&to=${user.email}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] text-gray-500 dark:text-gray-400 truncate hover:text-red-600 transition-colors block cursor-pointer pointer-events-auto"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {user.email}
+                            </a>
+                          ) : (
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">{user.phone || ''}</p>
+                          )}
+                        </div>
+                        <Link
+                          to="/profile"
+                          className="block px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsUserMenuOpen(false);
+                          }}
+                        >
+                          Profile
+                        </Link>
+                        <Link
+                          to="/my-ads"
+                          className="block px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsUserMenuOpen(false);
+                          }}
+                        >
+                          My Ads
+                        </Link>
+                        <Link
+                          to="/my-packages"
+                          className="block px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsUserMenuOpen(false);
+                          }}
+                        >
+                          My Packages
+                        </Link>
+                        <div className="border-t border-gray-200 dark:border-gray-700 my-0.5"></div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleLogout();
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-xs text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        >
+                          Logout
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 border-l border-gray-300 dark:border-gray-600 pl-2">
+                    <Link
+                      to="/signup"
+                      className="text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-500 text-xs font-semibold"
+                      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                    >
+                      {language === 'en' ? 'Sign Up' : 'رجسٹر'}
+                    </Link>
+                    <span className="text-gray-400">|</span>
+                    <Link
+                      to="/signin"
+                      className="text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-500 text-xs font-semibold"
+                      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                    >
+                      {language === 'en' ? 'Sign In' : 'لاگ ان'}
+                    </Link>
+                  </div>
+                )}
               </div>
 
               {/* Mobile Menu Button */}

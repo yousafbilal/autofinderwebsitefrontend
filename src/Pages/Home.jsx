@@ -42,6 +42,7 @@ import BlogPreviewSection from "../Components/BlogPreviewSection";
 
 
 import { server_ip, cities, budgetRanges } from "../Utils/Data";
+import { fetchWithRetry } from "../Utils/ApiUtils";
 import CustomSelect from "../Components/CustomSelect";
 import VoiceSearchComp from "../Components/VoiceSearch";
 
@@ -234,26 +235,10 @@ function Home() {
         setLoadingStats(true);
         const API_URL = server_ip || "http://localhost:8001";
 
-        // Fetch all car ads and users in parallel
+        // Fetch all car ads and users in parallel using robust fetch
         const [carsResponse, usersResponse] = await Promise.all([
-          fetch(`${API_URL}/all_ads`, {
-            method: "GET",
-            headers: {
-              Accept: "application/json",
-              "Content-Type": "application/json",
-            },
-            mode: "cors",
-            credentials: "omit",
-          }),
-          fetch(`${API_URL}/users`, {
-            method: "GET",
-            headers: {
-              Accept: "application/json",
-              "Content-Type": "application/json",
-            },
-            mode: "cors",
-            credentials: "omit",
-          }),
+          fetchWithRetry(`${API_URL}/all_ads`),
+          fetchWithRetry(`${API_URL}/users`),
         ]);
 
         if (carsResponse.ok && usersResponse.ok) {
@@ -381,7 +366,7 @@ function Home() {
       </Helmet>
 
       {/* Hero Search Section */}
-      <section className="relative min-h-screen snap-start flex items-center justify-center py-4 sm:py-6 md:py-8 lg:py-10">
+      <section className="relative h-screen snap-start flex items-center justify-center overflow-hidden">
         {/* 3D Animated Car Video Background */}
         <div className="absolute inset-0 overflow-hidden">
           <video
@@ -394,7 +379,7 @@ function Home() {
             style={{ zIndex: 0 }}
           >
             <source
-              src="https://cdn.pixabay.com/video/2023/10/12/184734-873923034_tiny.mp4"
+              src="/assets/videos/original-9c94a27b019688ee5cc12e7fdee8f02d.mp4"
               type="video/mp4"
             />
             {/* Fallback if video doesn't load */}
@@ -404,17 +389,17 @@ function Home() {
           <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-black/60"></div>
         </div>
 
-        {/* Content Container */}
-        <div className="container mx-auto px-3 sm:px-4 md:px-6 relative z-10 w-full h-full flex items-center justify-center -translate-y-12">
+        {/* Content Container - Adjusted Padding for Transparent Header */}
+        <div className="container mx-auto px-3 sm:px-4 md:px-6 relative z-10 w-full h-full flex items-center justify-center pt-[120px] sm:pt-[110px]">
           <div className="flex items-center justify-center w-full">
             {/* Search Form - Compact Beautiful Design */}
-            <div className={`rounded-lg sm:rounded-xl shadow-2xl dark:shadow-gray-900 w-full max-w-[280px] sm:max-w-[320px] md:max-w-[360px] mx-auto transform transition-all duration-300 hover:shadow-3xl border border-gray-200 dark:border-gray-700 
+            <div className={`rounded-lg sm:rounded-xl shadow-2xl dark:shadow-gray-900 w-full max-w-[270px] sm:max-w-[300px] md:max-w-[320px] mx-auto transform transition-all duration-300 hover:shadow-3xl border border-gray-200 dark:border-gray-700 
               ${searchType === "USED CAR"
                 ? "bg-gradient-to-br from-red-600 to-red-800 text-white"
                 : "bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
               }`}>
               {/* Header Section */}
-              <div className={`py-1.5 sm:py-2 px-2 sm:px-3 rounded-t-lg sm:rounded-t-xl transition-colors duration-300 
+              <div className={`py-1 sm:py-1 px-2 sm:px-3 rounded-t-lg sm:rounded-t-xl transition-colors duration-300 
                 ${searchType === "USED CAR"
                   ? "bg-black/20 text-white"
                   : "bg-gradient-to-r from-red-600 to-red-700 text-white"
@@ -427,9 +412,9 @@ function Home() {
                 </div>
               </div>
 
-              <div className="p-2 sm:p-3 md:p-4">
+              <div className="p-1 sm:p-1.5 md:p-2">
                 {/* Tabs */}
-                <div className="flex justify-center gap-1 sm:gap-1.5 mb-2 sm:mb-2.5">
+                <div className="flex justify-center gap-1 sm:gap-1.5 mb-1 sm:mb-1.5">
                   <button
                     onClick={() => setSearchType("NEW CAR")}
                     className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-md text-[9px] xs:text-[10px] sm:text-xs font-semibold transition-all duration-200 
@@ -455,8 +440,8 @@ function Home() {
                 </div>
 
                 {/* Radio Buttons */}
-                <div className="flex justify-center gap-2 sm:gap-3 mb-2 sm:mb-2.5">
-                  <label className="flex items-center justify-start gap-1.5 sm:gap-2 cursor-pointer group w-28 sm:w-32">
+                <div className="flex justify-center gap-2 sm:gap-3 mb-1 sm:mb-1.5">
+                  <label className="flex items-center justify-start gap-1.5 sm:gap-2 cursor-pointer group w-24 sm:w-28">
                     <input
                       id="search-by-budget"
                       type="radio"
@@ -505,17 +490,17 @@ function Home() {
                 </div>
 
                 {/* Third Row - Dropdowns and Buttons */}
-                <div className="space-y-1.5 sm:space-y-2">
+                <div className="space-y-1">
                   {searchBy === "BUDGET" ? (
                     <>
                       {/* First Row - SELECT BUDGET and SELECT CITY */}
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-1.5 sm:gap-2">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-1">
                         <CustomSelect
                           options={budgetRanges}
                           value={selectedBudget}
                           onChange={setSelectedBudget}
                           placeholder={t('selectBudget')}
-                          className="w-full sm:w-28"
+                          className="w-full sm:w-32"
                         />
                         <div className="relative flex items-center gap-2">
                           <CustomSelect
@@ -554,7 +539,7 @@ function Home() {
                         </div>
                       </div>
                       {/* Second Row - SEARCH and ADVANCED SEARCH */}
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-1.5 sm:gap-2">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-1">
                         <button
                           onClick={handleSearch}
                           className={`py-1.5 sm:py-2 px-3 sm:px-4 rounded-md font-semibold text-[9px] xs:text-[10px] sm:text-xs transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap flex-1 sm:flex-none 
@@ -604,14 +589,14 @@ function Home() {
                   ) : (
                     <>
                       {/* First Row - SELECT MODEL and SELECT CITY */}
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-1.5 sm:gap-2">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-1">
                         <CustomSelect
                           options={carMakes}
                           value={selectedModel}
                           onChange={setSelectedModel}
                           placeholder={t('selectModel')}
                           searchable={true}
-                          className="w-full sm:w-28"
+                          className="w-full sm:w-32"
                         />
                         <div
                           className="relative flex items-center gap-2"
@@ -623,7 +608,7 @@ function Home() {
                             onChange={setSelectedCity}
                             placeholder={t('selectCity')}
                             searchable={true}
-                            className="w-full sm:w-28"
+                            className="w-full sm:w-32"
                           />
                           <VoiceSearchComp
                             onResult={(text) => {

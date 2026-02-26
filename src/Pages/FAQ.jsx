@@ -1,41 +1,43 @@
 import React, { useState } from 'react';
 import { Helmet } from 'react-helmet';
+import { useLanguage } from '../Context/LanguageContext';
 
 function FAQ() {
+  const { t } = useLanguage();
   const [openIndex, setOpenIndex] = useState(null);
 
   const faqs = [
     {
-      question: 'How do I search for a car?',
-      answer: 'You can search for cars using our search filters. Select the brand, model, budget, and other preferences to find the perfect car for you.'
+      question: t('q1'),
+      answer: t('a1')
     },
     {
-      question: 'Can I compare different cars?',
-      answer: 'Yes, you can compare up to 3 cars side by side. Just click on the compare button on any car detail page.'
+      question: t('q2'),
+      answer: t('a2')
     },
     {
-      question: 'How do I contact a dealer?',
-      answer: 'You can contact dealers directly through the car detail page. Click on the "Contact Dealer" button to get in touch.'
+      question: t('q3'),
+      answer: t('a3')
     },
     {
-      question: 'What payment methods do you accept?',
-      answer: 'We accept various payment methods including cash, bank transfer, and financing options. Contact the dealer for more details.'
+      question: t('q4'),
+      answer: t('a4')
     },
     {
-      question: 'Do you offer car financing?',
-      answer: 'Yes, many of our dealers offer financing options. Please contact them directly to discuss financing plans.'
+      question: t('q5'),
+      answer: t('a5')
     }
   ];
 
   return (
     <>
       <Helmet>
-        <title>FAQ - Auto Finder</title>
+        <title>{t('faqTitle')} - Auto Finder</title>
       </Helmet>
 
       <div className="bg-gray-50 dark:bg-gray-900 min-h-screen py-6 transition-colors">
         <div className="container mx-auto px-4 max-w-3xl">
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4">Frequently Asked Questions</h1>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4">{t('faqTitle')}</h1>
 
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900 transition-colors">
             {faqs.map((faq, index) => (

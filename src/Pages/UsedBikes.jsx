@@ -6,8 +6,11 @@ import PriceRangeDropdown from '../Components/PriceRangeDropdown';
 import MileageRangeDropdown from '../Components/MileageRangeDropdown';
 import VoiceSearchComp from '../Components/VoiceSearch';
 import { server_ip } from '../Utils/Data';
+import { fetchWithRetry } from '../Utils/ApiUtils';
+import { useLanguage } from '../Context/LanguageContext';
 
 function UsedBikes() {
+  const { t } = useLanguage();
   const [bikes, setBikes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -123,19 +126,11 @@ function UsedBikes() {
         setError(null);
 
         const API_URL = server_ip || 'http://localhost:8001';
-        const endpoint = `${API_URL}/bike_ads`;
+        const endpoint = `${API_URL}/bike_ads/public`;
 
         console.log('🔄 Fetching used bikes from:', endpoint);
 
-        const response = await fetch(endpoint, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors',
-          credentials: 'omit',
-        });
+        const response = await fetchWithRetry(endpoint);
 
         console.log('📡 Response status:', response.status, response.statusText);
 
@@ -536,9 +531,9 @@ function UsedBikes() {
 
       <div className="bg-gray-50 dark:bg-gray-900 min-h-screen py-2 transition-colors">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-2">
-            <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-1">Used Bikes</h1>
-            <p className="text-gray-600 dark:text-gray-400 text-sm">Find your perfect bike</p>
+          <div className="text-center mb-6">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 mb-1">{t('usedBikesForSaleInPakistan')}</h1>
+            <p className="text-gray-600 dark:text-gray-400 text-sm">{t('findYourDreamBike')}</p>
           </div>
 
           {/* Active Filters */}
@@ -606,8 +601,8 @@ function UsedBikes() {
             <div className="w-full lg:w-56 xl:w-60 flex-shrink-0">
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 transition-colors overflow-hidden">
                 {/* SHOW RESULTS BY Header */}
-                <div className="bg-red-600 dark:bg-red-700 text-white px-2.5 py-2 font-semibold text-xs text-center">
-                  SHOW RESULTS BY
+                <div className="bg-red-600 dark:bg-red-700 text-white px-2.5 py-2 font-semibold text-xs text-center border-b border-white/10 uppercase">
+                  {t('showResultsBy')}
                 </div>
 
                 {/* SEARCH BY KEYWORD */}

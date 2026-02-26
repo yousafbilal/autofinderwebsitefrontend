@@ -6,6 +6,7 @@ import PriceRangeDropdown from '../Components/PriceRangeDropdown';
 import MileageRangeDropdown from '../Components/MileageRangeDropdown';
 import VoiceSearchComp from '../Components/VoiceSearch';
 import { server_ip } from '../Utils/Data';
+import { fetchWithRetry } from '../Utils/ApiUtils';
 import { useLanguage } from '../Context/LanguageContext';
 
 function SearchCars() {
@@ -130,15 +131,7 @@ function SearchCars() {
 
         console.log('🔄 Fetching all cars for search from:', endpoint);
 
-        const response = await fetch(endpoint, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors',
-          credentials: 'omit',
-        });
+        const response = await fetchWithRetry(`${API_URL}/all_ads`);
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);

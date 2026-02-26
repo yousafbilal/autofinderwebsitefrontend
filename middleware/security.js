@@ -47,11 +47,11 @@ setInterval(() => {
 
 // Get client IP address (production-safe)
 const getClientIP = (req) => {
-  return req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 
-         req.headers['x-real-ip'] || 
-         req.connection?.remoteAddress || 
-         req.socket?.remoteAddress ||
-         'unknown';
+  return req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+    req.headers['x-real-ip'] ||
+    req.connection?.remoteAddress ||
+    req.socket?.remoteAddress ||
+    'unknown';
 };
 
 // ==================== REQUEST TRACKING MIDDLEWARE ====================
@@ -59,7 +59,7 @@ const getClientIP = (req) => {
 const trackRequest = (req, res, next) => {
   const ip = getClientIP(req);
   const now = Date.now();
-  
+
   // Skip abuse detection for public endpoints (mobile app needs frequent requests)
   const publicEndpoints = [
     '/featured_ads/public',
@@ -70,20 +70,20 @@ const trackRequest = (req, res, next) => {
     '/advertising/published',
     '/health'
   ];
-  
+
   const isPublicEndpoint = publicEndpoints.some(endpoint => req.path.includes(endpoint));
-  
+
   // Only track non-public endpoints for abuse detection
   if (!isPublicEndpoint) {
     if (!requestCounts.has(ip)) {
       requestCounts.set(ip, []);
     }
-    
+
     const timestamps = requestCounts.get(ip);
     const recentRequests = timestamps.filter(ts => now - ts < SECURITY_CONFIG.RATE_LIMIT_WINDOW);
     recentRequests.push(now);
     requestCounts.set(ip, recentRequests);
-    
+
     // Detect potential abuse (too many requests) - only for non-public endpoints
     if (recentRequests.length > SECURITY_CONFIG.MAX_REQUESTS_PER_WINDOW * 2) {
       logSecurityEvent('ABUSE_DETECTED', {
@@ -94,7 +94,7 @@ const trackRequest = (req, res, next) => {
       });
     }
   }
-  
+
   next();
 };
 
@@ -102,7 +102,7 @@ const trackRequest = (req, res, next) => {
 const sanitizeInput = (input) => {
   if (input === null || input === undefined) return input;
   if (typeof input !== 'string') return input;
-  
+
   // Remove potential XSS attempts
   return input
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
@@ -119,7 +119,7 @@ const sanitizeObject = (obj) => {
   if (Array.isArray(obj)) {
     return obj.map(item => sanitizeObject(item));
   }
-  
+
   const sanitized = {};
   for (const [key, value] of Object.entries(obj)) {
     if (typeof value === 'string') {
@@ -149,19 +149,19 @@ const createSecureFileFilter = () => {
     if (!file.mimetype || !file.mimetype.startsWith('image/')) {
       return cb(new Error('Only image files are allowed'), false);
     }
-    
+
     // Validate against allowed types
     if (!SECURITY_CONFIG.ALLOWED_IMAGE_TYPES.includes(file.mimetype.toLowerCase())) {
       return cb(new Error(`File type ${file.mimetype} is not allowed. Allowed types: jpeg, jpg, png, gif, webp`), false);
     }
-    
+
     // Check file extension as secondary validation
     const ext = file.originalname?.split('.').pop()?.toLowerCase();
     const allowedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
     if (ext && !allowedExts.includes(ext)) {
       return cb(new Error(`File extension .${ext} is not allowed`), false);
     }
-    
+
     cb(null, true);
   };
 };
@@ -185,70 +185,70 @@ const rateLimitLogin = (req, res, next) => {
   try {
     const ip = getClientIP(req);
     const { emailOrPhone } = req.body || {};
-    
+
     // IP-based rate limiting
     const ipData = IP_ATTEMPTS.get(ip) || { count: 0, firstAttempt: Date.now() };
     const timeSinceFirstAttempt = Date.now() - ipData.firstAttempt;
-    
+
     if (timeSinceFirstAttempt > SECURITY_CONFIG.RATE_LIMIT_WINDOW) {
       IP_ATTEMPTS.set(ip, { count: 1, firstAttempt: Date.now() });
     } else {
       ipData.count++;
       IP_ATTEMPTS.set(ip, ipData);
-      
+
       if (ipData.count > SECURITY_CONFIG.MAX_REQUESTS_PER_WINDOW) {
         logSecurityEvent('RATE_LIMIT_EXCEEDED', { ip, endpoint: '/login' });
-        return res.status(429).json({ 
-          success: false, 
-          message: "Too many requests. Please try again later." 
+        return res.status(429).json({
+          success: false,
+          message: "Too many requests. Please try again later."
         });
       }
     }
-    
+
     // Account-based lockout
     if (emailOrPhone && typeof emailOrPhone === 'string') {
       const key = emailOrPhone.toLowerCase().trim();
       const attemptData = loginAttempts.get(key);
-      
+
       if (attemptData && attemptData.lockedUntil) {
         const now = Date.now();
         if (now < attemptData.lockedUntil) {
           const remainingMinutes = Math.ceil((attemptData.lockedUntil - now) / 60000);
-          return res.status(423).json({ 
-            success: false, 
-            message: `Account temporarily locked due to multiple failed login attempts. Please try again in ${remainingMinutes} minute(s).` 
+          return res.status(423).json({
+            success: false,
+            message: `Account temporarily locked due to multiple failed login attempts. Please try again in ${remainingMinutes} minute(s).`
           });
         } else {
           loginAttempts.delete(key);
         }
       }
     }
-    
+
     next();
   } catch (error) {
     logSecurityEvent('RATE_LIMIT_ERROR', { error: error.message });
     // Fail securely - block request on error
-    return res.status(500).json({ 
-      success: false, 
-      message: "Security check failed. Please try again later." 
+    return res.status(500).json({
+      success: false,
+      message: "Security check failed. Please try again later."
     });
   }
 };
 
 const recordFailedAttempt = (emailOrPhone, ip) => {
   if (!emailOrPhone) return;
-  
+
   const key = String(emailOrPhone).toLowerCase().trim();
   const attemptData = loginAttempts.get(key) || { count: 0, firstAttempt: Date.now() };
-  
+
   attemptData.count++;
   const timeSinceFirstAttempt = Date.now() - attemptData.firstAttempt;
-  
+
   if (timeSinceFirstAttempt > SECURITY_CONFIG.RATE_LIMIT_WINDOW) {
     attemptData.count = 1;
     attemptData.firstAttempt = Date.now();
   }
-  
+
   if (attemptData.count >= SECURITY_CONFIG.MAX_LOGIN_ATTEMPTS) {
     attemptData.lockedUntil = Date.now() + SECURITY_CONFIG.LOCKOUT_DURATION;
     logSecurityEvent('ACCOUNT_LOCKED', {
@@ -258,7 +258,7 @@ const recordFailedAttempt = (emailOrPhone, ip) => {
       lockedUntil: new Date(attemptData.lockedUntil).toISOString()
     });
   }
-  
+
   loginAttempts.set(key, attemptData);
 };
 
@@ -276,17 +276,17 @@ const securityHeaders = (req, res, next) => {
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-  
+
   // HSTS only if HTTPS (check protocol)
   if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   }
-  
+
   // Content Security Policy for API endpoints
-  res.setHeader('Content-Security-Policy', 
+  res.setHeader('Content-Security-Policy',
     "default-src 'self'; script-src 'none'; style-src 'none'; img-src 'self' data: https:; font-src 'none'; connect-src 'self' https:; frame-ancestors 'none';"
   );
-  
+
   next();
 };
 
@@ -303,75 +303,111 @@ const validatePhone = (phone) => {
   return phoneRegex.test(phone.trim()) && phone.length <= 20;
 };
 
+const validateSignupInput = (req, res, next) => {
+  try {
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ success: false, message: "Request body is required" });
+    }
+
+    const { name, email, phone, password } = req.body;
+
+    if (!name || !email || !phone || !password) {
+      return res.status(400).json({ success: false, message: "All fields are required" });
+    }
+
+    // Sanitize
+    req.body.name = sanitizeInput(String(name));
+    req.body.email = sanitizeInput(String(email));
+    req.body.phone = sanitizeInput(String(phone));
+    req.body.password = sanitizeInput(String(password));
+
+    // Validate
+    if (!validateEmail(req.body.email)) {
+      return res.status(400).json({ success: false, message: "Invalid email format" });
+    }
+    if (!validatePhone(req.body.phone)) {
+      return res.status(400).json({ success: false, message: "Invalid phone format" });
+    }
+    if (req.body.password.length < 8) {
+      return res.status(400).json({ success: false, message: "Password must be at least 8 characters" });
+    }
+
+    next();
+  } catch (error) {
+    logSecurityEvent('INPUT_VALIDATION_ERROR', { error: error.message });
+    return res.status(500).json({ success: false, message: "Error validating input" });
+  }
+};
+
 const validateLoginInput = (req, res, next) => {
   try {
     if (!req.body || typeof req.body !== 'object') {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Request body is required" 
+      return res.status(400).json({
+        success: false,
+        message: "Request body is required"
       });
     }
-    
+
     const { emailOrPhone, password, userType } = req.body;
-    
+
     if (!emailOrPhone || !password) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Email/Phone and password are required" 
+      return res.status(400).json({
+        success: false,
+        message: "Email/Phone and password are required"
       });
     }
-    
+
     // Sanitize inputs
     req.body.emailOrPhone = sanitizeInput(String(emailOrPhone));
     req.body.password = sanitizeInput(String(password));
     if (userType) {
       req.body.userType = sanitizeInput(String(userType));
     }
-    
+
     // Validate length limits
     if (req.body.emailOrPhone.length > 254) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Email/Phone is too long" 
+      return res.status(400).json({
+        success: false,
+        message: "Email/Phone is too long"
       });
     }
-    
+
     if (password.length < 6 || password.length > 128) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Password must be between 6 and 128 characters" 
+      return res.status(400).json({
+        success: false,
+        message: "Password must be between 6 and 128 characters"
       });
     }
-    
+
     // Validate email or phone format
     const isEmail = String(emailOrPhone).includes('@');
     if (isEmail && !validateEmail(emailOrPhone)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid email format" 
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email format"
       });
     }
     if (!isEmail && !validatePhone(emailOrPhone)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid phone format" 
+      return res.status(400).json({
+        success: false,
+        message: "Invalid phone format"
       });
     }
-    
+
     // Validate userType if provided
     if (userType && !['admin', 'superadmin', 'inspector'].includes(String(userType).toLowerCase())) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid user type" 
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user type"
       });
     }
-    
+
     next();
   } catch (error) {
     logSecurityEvent('INPUT_VALIDATION_ERROR', { error: error.message });
-    return res.status(500).json({ 
-      success: false, 
-      message: "Error validating input" 
+    return res.status(500).json({
+      success: false,
+      message: "Error validating input"
     });
   }
 };
@@ -387,13 +423,13 @@ const logSecurityEvent = (eventType, details) => {
     details: { ...details },
     ip: details.ip || 'unknown'
   };
-  
+
   securityLogs.push(logEntry);
-  
+
   if (securityLogs.length > MAX_LOG_ENTRIES) {
     securityLogs.shift();
   }
-  
+
   // Only log to console in non-production (but still track in memory)
   if (process.env.NODE_ENV !== 'production') {
     console.log(`🔐 Security Event: ${eventType}`, logEntry);
@@ -419,23 +455,23 @@ const comparePassword = async (plainPassword, hashedPassword) => {
 // ==================== ENHANCED AUTHENTICATION ====================
 const enhanceAuthenticateToken = (req, res, next) => {
   let token = null;
-  
+
   // Get token from Authorization header
   token = req.headers["authorization"] || req.headers["Authorization"];
-  
+
   if (!token && req.get) {
     token = req.get("Authorization");
   }
-  
+
   if (!token && req.header && typeof req.header === 'function') {
     token = req.header("Authorization");
   }
-  
+
   const ip = getClientIP(req);
 
   if (!token || typeof token !== 'string' || !token.startsWith("Bearer ")) {
     logSecurityEvent('AUTH_FAILED', { reason: 'Missing or invalid token format', ip, path: req.path });
-    return res.status(401).json({ 
+    return res.status(401).json({
       success: false,
       message: "Access denied. Token missing or invalid format.",
       error: "Authentication required. Please login again."
@@ -445,17 +481,17 @@ const enhanceAuthenticateToken = (req, res, next) => {
   const tokenWithoutBearer = (token.substring(7) || '').trim();
   if (!tokenWithoutBearer) {
     logSecurityEvent('AUTH_FAILED', { reason: 'Empty token after Bearer', ip, path: req.path });
-    return res.status(401).json({ 
+    return res.status(401).json({
       success: false,
       message: "Access denied. Token missing or invalid format.",
       error: "Authentication required. Please login again."
     });
   }
-  
+
   // Validate token format (basic JWT check)
   if (tokenWithoutBearer.split('.').length !== 3) {
     logSecurityEvent('AUTH_FAILED', { reason: 'Invalid token format', ip, path: req.path });
-    return res.status(401).json({ 
+    return res.status(401).json({
       success: false,
       message: "Invalid token format.",
       error: "Authentication failed. Please login again."
@@ -466,46 +502,46 @@ const enhanceAuthenticateToken = (req, res, next) => {
     const secretKey = process.env.JWT_SECRET_KEY || process.env.JWT_SECRET;
     if (!secretKey || secretKey.length < 32) {
       logSecurityEvent('CONFIG_ERROR', { error: 'JWT_SECRET_KEY not set or too short' });
-      return res.status(500).json({ 
+      return res.status(500).json({
         success: false,
-        message: "Server configuration error. Please contact administrator." 
+        message: "Server configuration error. Please contact administrator."
       });
     }
 
     const decoded = jwt.verify(tokenWithoutBearer, secretKey);
-    
+
     // Accept userId or id in payload (mobile app compatibility)
     const userId = decoded.userId || decoded.id || null;
-    
+
     // Check token expiry (jwt.verify may already throw TokenExpiredError; this is a fallback)
     if (decoded.exp && decoded.exp < Date.now() / 1000) {
       logSecurityEvent('AUTH_FAILED', { reason: 'Expired token', ip, userId });
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
         message: "Token expired. Please login again.",
         error: "Your session has expired. Please login again."
       });
     }
-    
+
     if (!userId) {
       logSecurityEvent('AUTH_FAILED', { reason: 'Token missing userId/id', ip });
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
         message: "Invalid token.",
         error: "Authentication failed. Please login again."
       });
     }
-    
+
     req.userId = typeof userId === 'string' ? userId : (userId.toString ? userId.toString() : String(userId));
     req.userType = decoded.userType || decoded.role || null;
     req.userIP = ip;
-    
+
     next();
   } catch (error) {
     // Distinguish expired token so user gets clear message
     if (error.name === 'TokenExpiredError') {
       logSecurityEvent('AUTH_FAILED', { reason: 'Expired token (jwt)', ip, path: req.path });
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
         message: "Token expired. Please login again.",
         error: "Your session has expired. Please login again."
@@ -513,14 +549,14 @@ const enhanceAuthenticateToken = (req, res, next) => {
     }
     if (error.name === 'JsonWebTokenError') {
       logSecurityEvent('AUTH_FAILED', { reason: 'Invalid token (signature/format)', ip, path: req.path, error: error.message });
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
         message: "Invalid token. Please login again.",
         error: "Authentication failed. Please login again."
       });
     }
     logSecurityEvent('AUTH_FAILED', { reason: 'Token verification failed', ip, error: error.message });
-    return res.status(401).json({ 
+    return res.status(401).json({
       success: false,
       message: "Invalid token. Please login again.",
       error: "Authentication failed. Please login again."
@@ -543,7 +579,7 @@ const detectSuspiciousActivity = (req, emailOrPhone, ip) => {
         });
         return true;
       }
-      
+
       if (!attemptData.ips) {
         attemptData.ips = [];
       }
@@ -562,14 +598,14 @@ const detectSuspiciousActivity = (req, emailOrPhone, ip) => {
 // This middleware removes passwords, tokens, and internal data but preserves contact info
 const sanitizePublicResponse = (req, res, next) => {
   const originalJson = res.json;
-  res.json = function(data) {
+  res.json = function (data) {
     if (data && typeof data === 'object') {
       // Remove highly sensitive fields (always remove these)
       const highlySensitiveFields = ['password', 'token', 'googleId', 'internalNotes', 'adminNotes', 'secret', 'apiKey'];
-      
+
       // Fields to remove from nested objects (but allow in top-level for seller-info endpoint)
       const nestedSensitiveFields = ['password', 'token', 'googleId', 'internalNotes', 'adminNotes', 'secret', 'apiKey', 'address'];
-      
+
       const sanitize = (obj, depth = 0) => {
         if (Array.isArray(obj)) {
           return obj.map(item => sanitize(item, depth + 1));
@@ -578,24 +614,24 @@ const sanitizePublicResponse = (req, res, next) => {
           const sanitized = {};
           for (const [key, value] of Object.entries(obj)) {
             const keyLower = key.toLowerCase();
-            
+
             // Always remove highly sensitive fields
             if (highlySensitiveFields.includes(keyLower)) {
               continue;
             }
-            
+
             // Remove nested sensitive fields (but allow email/phone at top level for seller-info)
             if (depth > 0 && nestedSensitiveFields.includes(keyLower)) {
               continue;
             }
-            
+
             sanitized[key] = typeof value === 'object' && value !== null ? sanitize(value, depth + 1) : value;
           }
           return sanitized;
         }
         return obj;
       };
-      
+
       data = sanitize(data);
     }
     return originalJson.call(this, data);
@@ -609,43 +645,45 @@ module.exports = {
   recordFailedAttempt,
   clearFailedAttempts,
   trackRequest,
-  
+
   // Security headers
   securityHeaders,
-  
+
+  // Input validation
   // Input validation
   validateLoginInput,
+  validateSignupInput,
   sanitizeRequestBody,
   sanitizeInput,
   sanitizeObject,
-  
+
   // File upload security
   createSecureFileFilter,
   getSecureMulterConfig,
-  
+
   // Authentication
   enhanceAuthenticateToken,
-  
+
   // Password
   hashPassword,
   comparePassword,
-  
+
   // Logging
   logSecurityEvent,
   getSecurityLogs: () => securityLogs,
-  
+
   // Detection
   detectSuspiciousActivity,
-  
+
   // Public response sanitization
   sanitizePublicResponse,
-  
+
   // Utilities
   getClientIP,
-  
+
   // Config (read-only)
   SECURITY_CONFIG: Object.freeze(SECURITY_CONFIG),
-  
+
   // Legacy exports for compatibility
   loginAttempts,
 };

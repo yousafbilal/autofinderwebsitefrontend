@@ -7,6 +7,7 @@ import MileageRangeDropdown from '../Components/MileageRangeDropdown';
 import VoiceSearchComp from '../Components/VoiceSearch';
 import { useLanguage } from '../Context/LanguageContext';
 import { server_ip } from '../Utils/Data';
+import { fetchWithRetry } from '../Utils/ApiUtils';
 
 function UsedCars() {
   const { t } = useLanguage();
@@ -168,35 +169,28 @@ function UsedCars() {
 
         const API_URL = server_ip || 'http://localhost:8001';
         const endpoints = [
-          { url: `${API_URL}/list_it_for_you_ad`, name: 'Managed by AutoFinder' },
-          { url: `${API_URL}/featured_ads`, name: 'Premium Cars' },
-          { url: `${API_URL}/free_ads`, name: 'Free Ads' }
+          { url: `${API_URL}/list_it_for_you_ad/public`, name: 'Managed by AutoFinder' },
+          { url: `${API_URL}/featured_ads/public`, name: 'Premium Cars' },
+          { url: `${API_URL}/all_ads`, name: 'Free Ads' }
         ];
 
         console.log('🔄 Fetching used cars from all sources...');
 
-        // Fetch from all endpoints in parallel
+        // Fetch from all endpoints in parallel using robust fetch
         const responses = await Promise.all(
           endpoints.map(endpoint =>
-            fetch(endpoint.url, {
-              method: 'GET',
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
-              mode: 'cors',
-              credentials: 'omit',
-            }).then(async (res) => {
-              if (!res.ok) {
-                console.warn(`⚠️ Failed to fetch from ${endpoint.name}: ${res.status}`);
+            fetchWithRetry(endpoint.url)
+              .then(async (res) => {
+                if (!res.ok) {
+                  console.warn(`⚠️ Failed to fetch from ${endpoint.name}: ${res.status}`);
+                  return { source: endpoint.name, data: [] };
+                }
+                const data = await res.json();
+                return { source: endpoint.name, data: Array.isArray(data) ? data : [] };
+              }).catch(err => {
+                console.error(`❌ Error fetching from ${endpoint.name}:`, err);
                 return { source: endpoint.name, data: [] };
-              }
-              const data = await res.json();
-              return { source: endpoint.name, data: Array.isArray(data) ? data : [] };
-            }).catch(err => {
-              console.error(`❌ Error fetching from ${endpoint.name}:`, err);
-              return { source: endpoint.name, data: [] };
-            })
+              })
           )
         );
 

@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import { server_ip } from '../Utils/Data';
+import { useLanguage } from '../Context/LanguageContext';
 
 function Blog() {
+  const { t, language } = useLanguage();
   const [blogPosts, setBlogPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -73,10 +75,14 @@ function Blog() {
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'Date not available';
+    if (!dateString) return t('dateNotAvailable');
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      return date.toLocaleDateString(language === 'ur' ? 'ur-PK' : 'en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
     } catch (e) {
       return dateString;
     }
@@ -92,12 +98,12 @@ function Blog() {
     return (
       <>
         <Helmet>
-          <title>Blog - Auto Finder</title>
+          <title>{t('blogTitleSuffixUrdu') ? `Blog ${t('blogTitleSuffixUrdu')}` : 'Blog - Auto Finder'}</title>
         </Helmet>
         <div className="bg-gray-50 dark:bg-gray-900 min-h-screen py-6 transition-colors">
           <div className="container mx-auto px-4">
-            <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-100 mb-4">Latest News</h1>
-            <p className="text-gray-600 dark:text-gray-400 mb-8">Loading blogs...</p>
+            <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-100 mb-4">{t('latestNewsHeader')}</h1>
+            <p className="text-gray-600 dark:text-gray-400 mb-8">{t('loadingUsedCars')}</p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div key={i} className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900 overflow-hidden animate-pulse">
@@ -120,18 +126,18 @@ function Blog() {
     return (
       <>
         <Helmet>
-          <title>Blog - Auto Finder</title>
+          <title>{t('blogTitleSuffixUrdu') ? `Blog ${t('blogTitleSuffixUrdu')}` : 'Blog - Auto Finder'}</title>
         </Helmet>
         <div className="bg-gray-50 dark:bg-gray-900 min-h-screen py-6 transition-colors">
           <div className="container mx-auto px-4">
             <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-lg p-6 text-center">
-              <p className="text-yellow-800 dark:text-yellow-400 font-semibold mb-2">Unable to load blogs</p>
-              <p className="text-yellow-700 dark:text-yellow-500 text-sm mb-2">Error: {error}</p>
+              <p className="text-yellow-800 dark:text-yellow-400 font-semibold mb-2">{t('unableToLoadUsedCars')}</p>
+              <p className="text-yellow-700 dark:text-yellow-500 text-sm mb-2">{error}</p>
               <button
                 onClick={() => window.location.reload()}
                 className="mt-4 bg-red-600 dark:bg-red-700 text-white px-4 py-2 rounded hover:bg-red-700 dark:hover:bg-red-800"
               >
-                Retry
+                {t('retry')}
               </button>
             </div>
           </div>
@@ -143,18 +149,22 @@ function Blog() {
   return (
     <>
       <Helmet>
-        <title>Blog - Auto Finder</title>
+        <title>{t('blogTitleSuffixUrdu') ? `Blog ${t('blogTitleSuffixUrdu')}` : 'Blog - Auto Finder'}</title>
       </Helmet>
 
       <div className="bg-gray-50 dark:bg-gray-900 min-h-screen py-2 transition-colors">
         <div className="container mx-auto px-4">
-          <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-2">Latest News</h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">Read our latest news and updates</p>
+          <h1 className="text-3xl font-extrabold text-gray-800 dark:text-gray-100 mb-2 uppercase tracking-wide border-b-2 border-red-600 inline-block pb-1">
+            {t('latestNewsHeader')}
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-4 font-medium italic">
+            {t('readLatestNews')}
+          </p>
 
           {blogPosts.length === 0 ? (
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-8 text-center">
-              <p className="text-gray-600 dark:text-gray-400 mb-2 font-semibold">No blog posts available at the moment.</p>
-              <p className="text-gray-500 dark:text-gray-500 text-xs mt-2">Check back later for updates.</p>
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-12 text-center border-2 border-dashed border-gray-200 dark:border-gray-700">
+              <p className="text-gray-600 dark:text-gray-400 mb-2 font-bold text-xl">{t('noBlogsAvailable')}</p>
+              <p className="text-gray-500 dark:text-gray-500 text-sm mt-2">{t('checkBackLater')}</p>
             </div>
           ) : (
             <>
@@ -174,18 +184,20 @@ function Blog() {
                         />
                       </div>
                       <div className="p-4">
-                        <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                          {post.author || 'Admin'} • {formatDate(post.dateAdded || post.date)}
+                        <div className="text-xs text-gray-600 dark:text-gray-400 mb-1 font-bold">
+                          {post.author || t('adminAuthor')} • {formatDate(post.dateAdded || post.date)}
                         </div>
-                        <h3 className="text-lg font-semibold mb-1 text-gray-800 dark:text-gray-200 line-clamp-1">{post.title}</h3>
-                        <p className="text-gray-600 dark:text-gray-400 text-xs mb-3 line-clamp-2">
+                        <h3 className="text-lg font-bold mb-1 text-gray-800 dark:text-gray-100 line-clamp-1 group-hover:text-red-600 transition-colors uppercase">
+                          {post.title}
+                        </h3>
+                        <p className="text-gray-600 dark:text-gray-400 text-xs mb-3 line-clamp-2 leading-relaxed">
                           {post.excerpt || (post.content ? post.content.substring(0, 150) + '...' : 'No excerpt available')}
                         </p>
                         <Link
                           to={`/blog/${post._id || post.id}`}
-                          className="text-red-600 dark:text-red-500 hover:text-red-700 dark:hover:text-red-600 font-semibold"
+                          className="text-red-600 dark:text-red-500 hover:text-red-700 dark:hover:text-red-600 font-extrabold flex items-center gap-1 group/btn"
                         >
-                          Read More →
+                          {t('readMoreBtn')}
                         </Link>
                       </div>
                     </div>
@@ -199,9 +211,9 @@ function Blog() {
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                     disabled={currentPage === 1}
-                    className={`px-4 py-2 rounded-md ${currentPage === 1 ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
+                    className={`px-4 py-2 rounded-md font-bold transition-all ${currentPage === 1 ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-600 cursor-not-allowed' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-red-600 hover:text-white dark:hover:bg-red-700'}`}
                   >
-                    Previous
+                    {language === 'ur' ? 'پچھلا' : 'Previous'}
                   </button>
                   {[...Array(totalPages)].map((_, index) => {
                     const page = index + 1;
@@ -210,7 +222,7 @@ function Blog() {
                         <button
                           key={page}
                           onClick={() => setCurrentPage(page)}
-                          className={`px-4 py-2 rounded-md ${currentPage === page ? 'bg-red-600 dark:bg-red-700 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
+                          className={`px-4 py-2 rounded-md font-bold transition-all ${currentPage === page ? 'bg-red-600 dark:bg-red-700 text-white shadow-lg' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-red-500 hover:text-white'}`}
                         >
                           {page}
                         </button>
@@ -223,9 +235,9 @@ function Blog() {
                   <button
                     onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                     disabled={currentPage === totalPages}
-                    className={`px-4 py-2 rounded-md ${currentPage === totalPages ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
+                    className={`px-4 py-2 rounded-md font-bold transition-all ${currentPage === totalPages ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-600 cursor-not-allowed' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-red-600 hover:text-white dark:hover:bg-red-700'}`}
                   >
-                    Next
+                    {language === 'ur' ? 'اگلا' : 'Next'}
                   </button>
                 </div>
               )}

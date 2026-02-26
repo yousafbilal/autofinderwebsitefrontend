@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
-  password: { type: String, required: function() { return !this.googleId; } }, // Required only if not Google user
+  password: { type: String, required: function () { return !this.googleId; } }, // Required only if not Google user
   email: { type: String, required: true, unique: true },
   phone: { type: String, required: false }, // Optional for Google users
   googleId: { type: String, unique: true, sparse: true }, // Google user ID
@@ -11,11 +11,14 @@ const userSchema = new mongoose.Schema({
   dateAdded: { type: Date, default: Date.now },
   isOnline: { type: Boolean, default: false },
   lastSeen: { type: Date, default: Date.now },
-  userType: { 
-    type: String, 
-    enum: ["User", "Inspector", "Admin", "SuperAdmin"], 
-    default: "User" 
+  userType: {
+    type: String,
+    enum: ["User", "Inspector", "Admin", "SuperAdmin"],
+    default: "User"
   },
+  isVerified: { type: Boolean, default: false },
+  tempOtp: { type: String, default: null },
+  otpExpires: { type: Date, default: null },
   // Dealer Package System (Apple In-App Purchase)
   role: {
     type: String,
@@ -49,42 +52,42 @@ const userSchema = new mongoose.Schema({
     default: null
   },
   postedAds: [
-  {
-    adId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Free_Ads", // or "Product" depending on your model name
-    },
-    isSold: {
-      type: Boolean,
-      default: false,
+    {
+      adId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Free_Ads", // or "Product" depending on your model name
+      },
+      isSold: {
+        type: Boolean,
+        default: false,
+      }
     }
-  }
-],
-bikeAds: [
-  {
-    adId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Bike_Ads", // or "Product" depending on your model name
-    },
-    isSold: {
-      type: Boolean,
-      default: false,
+  ],
+  bikeAds: [
+    {
+      adId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Bike_Ads", // or "Product" depending on your model name
+      },
+      isSold: {
+        type: Boolean,
+        default: false,
+      }
     }
-  }
-],
-autoPartsAds: [
-  {
-    adId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "AutoStoreAd", // or "Product" depending on your model name
-    },
-    isSold: {
-      type: Boolean,
-      default: false,
+  ],
+  autoPartsAds: [
+    {
+      adId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "AutoStoreAd", // or "Product" depending on your model name
+      },
+      isSold: {
+        type: Boolean,
+        default: false,
+      }
     }
-  }
-],
-featuredAds: [
+  ],
+  featuredAds: [
     {
       adId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -154,7 +157,7 @@ featuredAds: [
 userSchema.methods.resetFreeAds = function () {
   const now = new Date();
   const nextResetDate = new Date(this.lastAdReset);
-  
+
   // Set the next reset date to exactly one month after last reset
   nextResetDate.setMonth(nextResetDate.getMonth() + 1);
 
@@ -208,17 +211,17 @@ userSchema.methods.isPremiumPackageActive = function () {
   if (!this.premiumPackage.isActive || !this.premiumPackage.expiryDate || this.premiumPackage.status !== 'active') {
     return false;
   }
-  
+
   const now = new Date();
   const isActive = now < this.premiumPackage.expiryDate;
-  
+
   // If expired, deactivate the package
   if (!isActive && this.premiumPackage.isActive) {
     this.premiumPackage.isActive = false;
     this.premiumPackage.status = 'expired';
     this.save();
   }
-  
+
   return isActive;
 };
 
@@ -226,7 +229,7 @@ userSchema.methods.isPremiumPackageActive = function () {
 userSchema.methods.purchasePremiumPackage = function (packageType, amount, packageCategory = 'general') {
   const now = new Date();
   const expiryDate = new Date(now);
-  
+
   // Set expiry date based on package type
   switch (packageType) {
     case '7-day':
@@ -250,7 +253,7 @@ userSchema.methods.purchasePremiumPackage = function (packageType, amount, packa
     default:
       throw new Error('Invalid package type');
   }
-  
+
   // Update premium package info (status: pending)
   this.premiumPackage = {
     type: packageType,
@@ -263,11 +266,11 @@ userSchema.methods.purchasePremiumPackage = function (packageType, amount, packa
     approvedAt: null,
     rejectedAt: null
   };
-  
+
   // Update payment info
   this.totalPaidAmount += amount;
   this.premiumAdjustment += amount;
-  
+
   return this.save();
 };
 
@@ -276,12 +279,12 @@ userSchema.methods.approvePremiumPackage = function (adminNotes = '') {
   if (this.premiumPackage.status !== 'pending') {
     throw new Error('Package is not pending approval');
   }
-  
+
   this.premiumPackage.status = 'active';
   this.premiumPackage.isActive = true;
   this.premiumPackage.adminNotes = adminNotes;
   this.premiumPackage.approvedAt = new Date();
-  
+
   return this.save();
 };
 
@@ -290,12 +293,12 @@ userSchema.methods.rejectPremiumPackage = function (adminNotes = '') {
   if (this.premiumPackage.status !== 'pending') {
     throw new Error('Package is not pending approval');
   }
-  
+
   this.premiumPackage.status = 'rejected';
   this.premiumPackage.isActive = false;
   this.premiumPackage.adminNotes = adminNotes;
   this.premiumPackage.rejectedAt = new Date();
-  
+
   return this.save();
 };
 
@@ -303,13 +306,13 @@ userSchema.methods.rejectPremiumPackage = function (adminNotes = '') {
 userSchema.methods.getPremiumPackageInfo = function () {
   const isActive = this.isPremiumPackageActive();
   const now = new Date();
-  
+
   let daysRemaining = 0;
   if (this.premiumPackage.expiryDate && isActive) {
     const timeDiff = this.premiumPackage.expiryDate.getTime() - now.getTime();
     daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
   }
-  
+
   return {
     type: this.premiumPackage.type,
     isActive,

@@ -4,8 +4,11 @@ import { Link } from 'react-router-dom';
 import { FaCog, FaMapMarkerAlt, FaChevronDown, FaChevronUp, FaSearch } from 'react-icons/fa';
 import VoiceSearchComp from '../Components/VoiceSearch';
 import { server_ip } from '../Utils/Data';
+import { fetchWithRetry } from '../Utils/ApiUtils';
+import { useLanguage } from '../Context/LanguageContext';
 
 function AutoStore() {
+  const { t } = useLanguage();
   const [parts, setParts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -35,6 +38,24 @@ function AutoStore() {
     'Other'
   ];
 
+  const getCategoryKey = (category) => {
+    switch (category) {
+      case 'All': return 'allCategories';
+      case 'Engine Parts': return 'engineParts';
+      case 'Body Parts': return 'bodyParts';
+      case 'Electrical': return 'electrical';
+      case 'Interior': return 'interior';
+      case 'Exterior': return 'exterior';
+      case 'Accessories': return 'accessories';
+      case 'Tires & Wheels': return 'tiresWheels';
+      case 'Brake System': return 'brakeSystem';
+      case 'Suspension': return 'suspension';
+      case 'Transmission': return 'transmission';
+      case 'Other': return 'other';
+      default: return category.toLowerCase().replace(/\s+/g, '');
+    }
+  };
+
 
   // Fetch auto parts from backend
   useEffect(() => {
@@ -44,19 +65,11 @@ function AutoStore() {
         setError(null);
 
         const API_URL = server_ip || 'http://localhost:8001';
-        const endpoint = `${API_URL}/autoparts`;
+        const endpoint = `${API_URL}/autoparts/public`;
 
         console.log('🔄 Fetching auto parts from:', endpoint);
 
-        const response = await fetch(endpoint, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors',
-          credentials: 'omit',
-        });
+        const response = await fetchWithRetry(endpoint);
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -182,22 +195,22 @@ function AutoStore() {
   };
 
   const formatPrice = (price) => {
-    if (!price) return 'Price on call';
+    if (!price) return t('priceOnCall');
     return `PKR ${price.toLocaleString()}`;
   };
 
   return (
     <>
       <Helmet>
-        <title>Auto Store - Auto Parts & Accessories | Auto Finder</title>
-        <meta name="description" content="Buy auto parts and accessories from Auto Finder. Find engine parts, body parts, electrical components, and more." />
+        <title>{t('autoStore')} - {t('findAutoParts')} | Auto Finder</title>
+        <meta name="description" content={t('findAutoParts')} />
       </Helmet>
 
       <div className="bg-gray-50 dark:bg-gray-900 min-h-screen py-2 transition-colors">
         <div className="container mx-auto px-4">
           <div className="text-center mb-6">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 mb-1">Auto Store</h1>
-            <p className="text-gray-600 dark:text-gray-400 text-sm">Find auto parts and accessories for your vehicle</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 mb-1">{t('autoStore')}</h1>
+            <p className="text-gray-600 dark:text-gray-400 text-sm">{t('findAutoParts')}</p>
           </div>
 
           {/* Active Filters */}
@@ -205,17 +218,17 @@ function AutoStore() {
             <div className="mb-4 flex flex-wrap items-center gap-2">
               {searchKeyword && (
                 <span className="bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 px-3 py-1 rounded-full text-sm font-medium">
-                  Search: {searchKeyword}
+                  {t('search')}: {searchKeyword}
                 </span>
               )}
               {selectedCategories.length > 0 && (
                 <span className="bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 px-3 py-1 rounded-full text-sm font-medium">
-                  Categories: {selectedCategories.join(', ')}
+                  {t('category')}: {selectedCategories.map(c => t(getCategoryKey(c))).join(', ')}
                 </span>
               )}
               {(priceFrom || priceTo) && (
                 <span className="bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 px-3 py-1 rounded-full text-sm font-medium">
-                  Price: {priceFrom ? `PKR ${parseFloat(priceFrom).toLocaleString()}` : '0'} - {priceTo ? `PKR ${parseFloat(priceTo).toLocaleString()}` : '∞'}
+                  {t('price')}: {priceFrom ? `PKR ${parseFloat(priceFrom).toLocaleString()}` : '0'} - {priceTo ? `PKR ${parseFloat(priceTo).toLocaleString()}` : '∞'}
                 </span>
               )}
               <button
@@ -227,7 +240,7 @@ function AutoStore() {
                 }}
                 className="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 px-3 py-1 rounded-full text-sm font-medium transition-colors"
               >
-                Clear filters
+                {t('clearFilters')}
               </button>
             </div>
           )}
@@ -238,7 +251,7 @@ function AutoStore() {
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 transition-colors">
                 {/* SHOW RESULTS BY Header */}
                 <div className="bg-red-600 dark:bg-red-700 text-white px-2.5 py-2 font-semibold text-xs text-center border-b border-white/10">
-                  SHOW RESULTS BY
+                  {t('showResultsBy')}
                 </div>
 
                 {/* SEARCH BY KEYWORD */}
@@ -247,7 +260,7 @@ function AutoStore() {
                     <div className="relative flex-1">
                       <input
                         type="text"
-                        placeholder="Search parts..."
+                        placeholder={t('searchByPartName')}
                         value={searchKeyword}
                         onChange={(e) => setSearchKeyword(e.target.value)}
                         className="w-full px-2 py-1.5 pr-8 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-red-500"
@@ -281,7 +294,7 @@ function AutoStore() {
                     }}
                     className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                   >
-                    <span className="font-semibold text-gray-800 dark:text-gray-200">BY CATEGORY</span>
+                    <span className="font-semibold text-gray-800 dark:text-gray-200 uppercase">{t('byCategory')}</span>
                     {isCategoryOpen ? (
                       <FaChevronUp className="text-gray-500 dark:text-gray-400" />
                     ) : (
@@ -305,7 +318,7 @@ function AutoStore() {
                                 onChange={() => toggleCategory(category)}
                                 className="w-4 h-4 text-red-600 border-gray-300 dark:border-gray-600 rounded focus:ring-red-500"
                               />
-                              <span className="text-sm text-gray-700 dark:text-gray-300">{category}</span>
+                              <span className="text-sm text-gray-700 dark:text-gray-300">{t(getCategoryKey(category))}</span>
                             </div>
                             <span className="bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 text-xs px-2 py-0.5 rounded-full">
                               {count.toLocaleString()}
@@ -328,7 +341,7 @@ function AutoStore() {
                     }}
                     className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                   >
-                    <span className="font-semibold text-gray-800 dark:text-gray-200">BY PRICE</span>
+                    <span className="font-semibold text-gray-800 dark:text-gray-200 uppercase">{t('byPrice')}</span>
                     {isPriceOpen ? (
                       <FaChevronUp className="text-gray-500 dark:text-gray-400" />
                     ) : (
@@ -340,14 +353,14 @@ function AutoStore() {
                       <div className="flex gap-1.5 items-center w-full">
                         <input
                           type="number"
-                          placeholder="From"
+                          placeholder={t('from')}
                           value={priceFrom}
                           onChange={(e) => setPriceFrom(e.target.value)}
                           className="flex-1 min-w-0 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-red-500"
                         />
                         <input
                           type="number"
-                          placeholder="To"
+                          placeholder={t('to')}
                           value={priceTo}
                           onChange={(e) => setPriceTo(e.target.value)}
                           className="flex-1 min-w-0 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-red-500"
@@ -356,7 +369,7 @@ function AutoStore() {
                           onClick={() => { }}
                           className="bg-red-600 dark:bg-red-700 hover:bg-red-700 dark:hover:bg-red-600 text-white px-2.5 py-1 rounded text-xs font-semibold transition whitespace-nowrap flex-shrink-0"
                         >
-                          Go
+                          {t('go')}
                         </button>
                       </div>
                     </div>
@@ -371,7 +384,7 @@ function AutoStore() {
               {/* Loading State */}
               {loading && (
                 <div className="text-center py-12">
-                  <p className="text-gray-600 dark:text-gray-400 text-lg">Loading auto parts...</p>
+                  <p className="text-gray-600 dark:text-gray-400 text-lg">{t('loading')}...</p>
                   <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">
                     {[1, 2, 3, 4].map((i) => (
                       <div key={i} className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900 overflow-hidden animate-pulse">
@@ -389,13 +402,13 @@ function AutoStore() {
               {/* Error State */}
               {error && !loading && (
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-lg p-6 text-center">
-                  <p className="text-yellow-800 dark:text-yellow-400 font-semibold mb-2">Unable to load auto parts</p>
-                  <p className="text-yellow-700 dark:text-yellow-500 text-sm mb-2">Error: {error}</p>
+                  <p className="text-yellow-800 dark:text-yellow-400 font-semibold mb-2">{t('unableToLoad')}</p>
+                  <p className="text-yellow-700 dark:text-yellow-500 text-sm mb-2">{t('error')}: {error}</p>
                   <button
                     onClick={() => window.location.reload()}
                     className="mt-4 bg-red-600 dark:bg-red-700 text-white px-4 py-2 rounded hover:bg-red-700 dark:hover:bg-red-800"
                   >
-                    Retry
+                    {t('retry')}
                   </button>
                 </div>
               )}
@@ -404,11 +417,11 @@ function AutoStore() {
               {!loading && !error && filteredParts.length === 0 && (
                 <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-8 text-center">
                   <p className="text-gray-600 dark:text-gray-400 mb-2 font-semibold text-lg">
-                    No auto parts found
-                    {selectedCategories.length > 0 && ` in ${selectedCategories.join(', ')}`}
-                    {(priceFrom || priceTo) && ` for price range ${priceFrom ? `PKR ${parseFloat(priceFrom).toLocaleString()}` : '0'} - ${priceTo ? `PKR ${parseFloat(priceTo).toLocaleString()}` : '∞'}`}
+                    {t('noResultsFound')}
+                    {selectedCategories.length > 0 && ` ${t('inKeyword')} ${selectedCategories.map(c => t(getCategoryKey(c))).join(', ')}`}
+                    {(priceFrom || priceTo) && ` ${t('forYourQuickLook')} ${priceFrom ? `PKR ${parseFloat(priceFrom).toLocaleString()}` : '0'} - ${priceTo ? `PKR ${parseFloat(priceTo).toLocaleString()}` : '∞'}`}
                   </p>
-                  <p className="text-gray-500 dark:text-gray-500 text-sm mt-2">Try selecting different filters</p>
+                  <p className="text-gray-500 dark:text-gray-500 text-sm mt-2">{t('trySelectingDifferentFilters')}</p>
                   <button
                     onClick={() => {
                       setSelectedCategories([]);
@@ -417,7 +430,7 @@ function AutoStore() {
                     }}
                     className="mt-4 bg-red-600 dark:bg-red-700 text-white px-6 py-2 rounded hover:bg-red-700 dark:hover:bg-red-800"
                   >
-                    Clear Filters
+                    {t('clearFilters')}
                   </button>
                 </div>
               )}
@@ -426,9 +439,8 @@ function AutoStore() {
               {!loading && !error && filteredParts.length > 0 && (
                 <>
                   <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-                    Showing {filteredParts.length} {filteredParts.length === 1 ? 'part' : 'parts'}
-                    {selectedCategories.length > 0 && ` in ${selectedCategories.join(', ')}`}
-                    {(priceFrom || priceTo) && ` (Price: ${priceFrom ? `PKR ${parseFloat(priceFrom).toLocaleString()}` : '0'} - ${priceTo ? `PKR ${parseFloat(priceTo).toLocaleString()}` : '∞'})`}
+                    {t('showing')} {filteredParts.length} {t('itemsFound')}
+                    {selectedCategories.length > 0 && ` ${t('inKeyword')} ${selectedCategories.map(c => t(getCategoryKey(c))).join(', ')}`}
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
                     {filteredParts.map((part) => {
@@ -448,7 +460,7 @@ function AutoStore() {
                             <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                             {part.category && (
                               <span className="absolute top-2 left-2 bg-red-600 dark:bg-red-700 text-white px-2 py-1 rounded text-xs font-semibold">
-                                {part.category}
+                                {t(getCategoryKey(part.category)) || part.category}
                               </span>
                             )}
                           </div>
@@ -473,7 +485,7 @@ function AutoStore() {
                             {part.brand && (
                               <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 mb-4">
                                 <FaCog className="text-red-600 dark:text-red-500" />
-                                <span>Brand: {part.brand}</span>
+                                <span>{t('make')}: {part.brand}</span>
                               </div>
                             )}
                             {/* Spacer to push button to bottom */}
@@ -482,7 +494,7 @@ function AutoStore() {
                               to={`/auto-part-detail/${part._id}`}
                               className="block w-full bg-red-600 dark:bg-red-700 hover:bg-red-700 dark:hover:bg-red-800 text-white text-center py-2 rounded-md transition font-semibold mt-auto"
                             >
-                              View Details
+                              {t('viewDetails')}
                             </Link>
                           </div>
                         </div>

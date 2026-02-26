@@ -3,6 +3,7 @@ import { Helmet } from 'react-helmet';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { FaCar, FaMapMarkerAlt, FaCalendarAlt, FaCog, FaBolt, FaPhone, FaStar } from 'react-icons/fa';
 import { server_ip } from '../Utils/Data';
+import { fetchWithRetry } from '../Utils/ApiUtils';
 import { useLanguage } from '../Context/LanguageContext';
 
 function UsedCarDetail() {
@@ -32,15 +33,7 @@ function UsedCarDetail() {
         console.log('🔄 Fetching car details for ID:', id);
         console.log('🔗 Endpoint:', endpoint);
 
-        const response = await fetch(endpoint, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors',
-          credentials: 'omit',
-        });
+        const response = await fetchWithRetry(endpoint);
 
         console.log('📡 Response status:', response.status, response.statusText);
 

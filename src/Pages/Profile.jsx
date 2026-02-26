@@ -3,6 +3,7 @@ import { Helmet } from 'react-helmet';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../Context/LanguageContext';
 import { server_ip } from '../Utils/Data';
+import { fetchWithRetry } from '../Utils/ApiUtils';
 
 function Profile() {
   const { t } = useLanguage();
@@ -65,12 +66,7 @@ function Profile() {
             const userId = userData._id || userData.id;
             console.log('Fetching fresh user data from backend for userId:', userId);
 
-            const response = await fetch(`${API_URL}/users/${userId}`, {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            });
+            const response = await fetchWithRetry(`${API_URL}/users/${userId}`);
 
             if (response.ok) {
               const freshUserData = await response.json();
@@ -214,11 +210,8 @@ function Profile() {
 
     try {
       const API_URL = server_ip || 'http://localhost:8001';
-      const response = await fetch(`${API_URL}/forgot-password`, {
+      const response = await fetchWithRetry(`${API_URL}/forgot-password`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ emailOrPhone: user.email }),
       });
 
@@ -251,11 +244,8 @@ function Profile() {
 
     try {
       const API_URL = server_ip || 'http://localhost:8001';
-      const response = await fetch(`${API_URL}/verify-otp`, {
+      const response = await fetchWithRetry(`${API_URL}/verify-otp`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           emailOrPhone: user.email,
           otp: otp.trim()
@@ -339,9 +329,10 @@ function Profile() {
           const imageFormData = new FormData();
           imageFormData.append('profilePic', profileImage);
 
-          const imageResponse = await fetch(`${API_URL}/edit-profile-pic/${userId}`, {
+          const imageResponse = await fetchWithRetry(`${API_URL}/edit-profile-pic/${userId}`, {
             method: 'PUT',
             body: imageFormData,
+            headers: {} // Don't set content-type for FormData
           });
 
           const imageData = await imageResponse.json();
@@ -392,11 +383,8 @@ function Profile() {
       // Use dateAdded as dob if available, otherwise use current date
       const dob = user.dateAdded || new Date().toISOString();
 
-      const detailsResponse = await fetch(`${API_URL}/edit-profile-details/${userId}`, {
+      const detailsResponse = await fetchWithRetry(`${API_URL}/edit-profile-details/${userId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           name: formData.name,
           phone: formData.phone,

@@ -47,6 +47,8 @@ import MyPackages from "./Pages/MyPackages";
 import BoostAd from "./Pages/BoostAd";
 import Help from "./Pages/Help";
 import PrivacyPolicy from "./Pages/PrivacyPolicy";
+import ForgotPassword from "./Pages/ForgotPassword";
+
 
 function App() {
   return (
@@ -118,6 +120,8 @@ function App() {
           {/* Auth Routes */}
           <Route path='/signup' element={<Auth />} />
           <Route path='/signin' element={<Auth />} />
+          <Route path='/forgot-password' element={<ForgotPassword />} />
+
 
           {/* User Routes */}
           <Route path='/profile' element={<Base><Profile /></Base>} />

@@ -3,7 +3,9 @@
 const mongoose = require('mongoose');
 
 // ✅ SECURED: MongoDB URI moved to environment variable
-const dbURI = process.env.MONGODB_URI;
+// const dbURI = process.env.MONGODB_URI;
+const dbURI = "mongodb+srv://autofinder:anas@cluster0.fcal8.mongodb.net/Autofinder?retryWrites=true&w=majority&appName=Cluster0";
+console.log('🔍 Using HARDCODED MONGODB_URI:', dbURI.slice(0, 30) + '...');
 if (!dbURI) {
   console.error('❌ MONGODB_URI environment variable is missing!');
   throw new Error('MONGODB_URI is required. Set it in .env or node.env in project root.');
@@ -13,9 +15,9 @@ if (!dbURI) {
 const connectDB = async () => {
   try {
     console.log('🔄 Attempting to connect to MongoDB...');
-    
-    await mongoose.connect(dbURI, { 
-      useNewUrlParser: true, 
+
+    await mongoose.connect(dbURI, {
+      useNewUrlParser: true,
       useUnifiedTopology: true,
       serverSelectionTimeoutMS: 10000, // Reduced to 10 seconds - fail fast
       socketTimeoutMS: 20000, // Socket timeout: 20 seconds
@@ -25,7 +27,7 @@ const connectDB = async () => {
       retryWrites: true,
       w: 'majority'
     });
-    
+
     console.log('✅ Connected to MongoDB successfully');
   } catch (error) {
     console.error('❌ MongoDB connection error:', error);

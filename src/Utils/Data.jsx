@@ -144,8 +144,7 @@ const teamMembers = [
 
 ];
 
-// Backend API URL - Local Development Server
-// Website is connected to localhost backend: http://localhost:8001
-const server_ip = process.env.REACT_APP_SERVER_ADDRESS || 'http://localhost:8001'
+// Backend API URL - Standardized to 127.0.0.1 to avoid localhost preflight issues
+const server_ip = process.env.REACT_APP_SERVER_ADDRESS || 'http://127.0.0.1:8001'
 
 export { ContactInfo, teamMembers, server_ip, cities, budgetRanges }

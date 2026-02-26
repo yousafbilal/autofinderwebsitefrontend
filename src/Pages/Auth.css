@@ -16,7 +16,7 @@
 
 .auth-container-wrapper h1 {
     font-weight: bold;
-    margin: 0;
+    margin: 2px 0;
 }
 
 .auth-container-wrapper h2 {
@@ -24,12 +24,11 @@
 }
 
 .auth-container-wrapper p {
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 100;
-    line-height: 20px;
-    letter-spacing: 0.5px;
-    margin: 10px 0 15px;
-    /* Reduced from 20px 0 30px */
+    line-height: 16px;
+    letter-spacing: 0.3px;
+    margin: 4px 0 8px;
 }
 
 .auth-container-wrapper span {
@@ -72,33 +71,26 @@
 
 .auth-container-wrapper form {
     background-color: transparent;
-    /* Changed from #FFFFFF to allow container transparency to show */
     display: flex;
     align-items: center;
     justify-content: center;
-    /* Reverted to center */
     flex-direction: column;
-    padding: 0 10px;
-    /* Reverted padding */
+    padding: 0 15px;
     height: 100%;
     text-align: center;
 }
 
 .auth-container {
     background-color: rgba(255, 255, 255, 0.95);
-    /* Original 95% opacity */
     backdrop-filter: blur(4px);
-    /* Original blur effect */
     border-radius: 10px;
     box-shadow: 0 14px 28px rgba(0, 0, 0, 0.25),
         0 10px 10px rgba(0, 0, 0, 0.22);
     position: relative;
     overflow: hidden;
-    width: 550px;
-    /* Further reduced from 600px */
-    max-width: 100%;
+    width: 500px;
+    max-width: 95%;
     min-height: 380px;
-    /* Reduced from 450px to crop bottom */
 }
 
 .form-container {
@@ -222,7 +214,7 @@
 }
 
 .social-container {
-    margin: 20px 0;
+    margin: 8px 0 4px;
 }
 
 .social-container a {

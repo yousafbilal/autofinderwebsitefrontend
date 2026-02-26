@@ -5,9 +5,9 @@ require('dotenv').config({ path: './node.env' });
 
 // SECURITY: Disable debug/info logs in production (reduces info leakage)
 if (process.env.NODE_ENV === 'production') {
-  console.log = () => {};
-  console.debug = () => {};
-  console.info = () => {};
+  console.log = () => { };
+  console.debug = () => { };
+  console.info = () => { };
 }
 
 const express = require('express');
@@ -22,6 +22,10 @@ const rateLimit = require('express-rate-limit');
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
+const twilio = require('twilio');
+
+
+
 
 // Import database connection
 const mongoose = require('mongoose');
@@ -164,7 +168,68 @@ if (typeof securityMiddleware.enhanceAuthenticateToken !== 'function') {
 
 const authenticateToken = securityMiddleware.enhanceAuthenticateToken;
 const requestSecurity = require('./middleware/requestSecurity');
-console.log('✅ Security middleware loaded successfully');
+
+// Twilio Configuration
+const client = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
+
+const twilioService = {
+  sendWhatsAppOTP: async (phone) => {
+    try {
+      // Ensure correct format (E.164 only for Verify API)
+      const formattedPhone = phone.startsWith("+")
+        ? phone
+        : `+${phone}`;
+
+      console.log("📲 Sending OTP to WhatsApp:", formattedPhone);
+
+      const verification = await client.verify.v2
+        .services(process.env.TWILIO_VERIFY_SERVICE_SID)
+        .verifications.create({
+          to: formattedPhone,
+          channel: "whatsapp"
+        });
+
+      return { success: true, data: verification };
+
+    } catch (error) {
+      console.error("❌ Twilio Send OTP Error:", error.message);
+      if (error.message.includes("not configured")) {
+        console.warn("💡 TIP: Enable the WhatsApp channel for your Verify Service in Twilio Console!");
+      }
+      if (error.message.includes("channel disabled")) {
+        console.warn("💡 TIP: Your selected delivery channel (WhatsApp/SMS) is disabled in Twilio Console!");
+      }
+      return { success: false, error: error.message };
+    }
+  },
+  verifyOTP: async (phone, code) => {
+    try {
+      const formattedPhone = phone.startsWith("+")
+        ? phone
+        : `+${phone}`;
+
+      const verificationCheck = await client.verify.v2
+        .services(process.env.TWILIO_VERIFY_SERVICE_SID)
+        .verificationChecks.create({
+          to: formattedPhone,
+          code: code
+        });
+
+      return {
+        success: verificationCheck.status === "approved"
+      };
+
+    } catch (error) {
+      console.error("❌ Twilio Verify Error:", error);
+      return { success: false };
+    }
+  }
+};
+
+console.log('✅ Twilio Service loaded successfully');
 // ==================== END SECURITY MIDDLEWARE CHECK ====================
 
 // ==================== MULTER CONFIGURATION (After security middleware loaded) ====================
@@ -245,14 +310,14 @@ app.get('/health', (req, res) => {
     'http://localhost:3001',
     'http://localhost:8081'
   ];
-  
+
   if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
   }
-  
-  res.json({ 
-    status: 'ok', 
+
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
     server: 'running'
   });
@@ -273,7 +338,7 @@ app.options('/health', (req, res) => {
     'http://localhost:3001',
     'http://localhost:8081'
   ];
-  
+
   if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -285,8 +350,8 @@ app.options('/health', (req, res) => {
 
 // Root route - simple response
 app.get('/', (req, res) => {
-  res.json({ 
-    message: 'AutoFinder Backend API', 
+  res.json({
+    message: 'AutoFinder Backend API',
     status: 'running',
     version: '1.0.0',
     timestamp: new Date().toISOString()
@@ -298,8 +363,8 @@ app.get('/health/detailed', (req, res) => {
   const dbState = mongoose.connection.readyState;
   const dbStatus = dbState === 1 ? 'connected' : dbState === 2 ? 'connecting' : 'disconnected';
   const dbName = mongoose.connection.db ? mongoose.connection.db.databaseName : null;
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
     db: dbStatus,
     dbState: dbState,
@@ -332,8 +397,8 @@ app.get('/debug/db-counts', async (req, res) => {
 
 // Quick test endpoint for mobile app (no DB query, instant response)
 app.get('/test', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     message: 'Backend is responding',
     timestamp: new Date().toISOString()
   });
@@ -342,35 +407,35 @@ app.get('/test', (req, res) => {
 // ==================== REQUEST LOGGING (for debugging) ====================
 app.use((req, res, next) => {
   const startTime = Date.now();
-  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 
-             req.headers['x-real-ip'] || 
-             req.connection?.remoteAddress || 
-             req.socket?.remoteAddress ||
-             'unknown';
-  
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+    req.headers['x-real-ip'] ||
+    req.connection?.remoteAddress ||
+    req.socket?.remoteAddress ||
+    'unknown';
+
   // Log important endpoints
-  if (req.path.includes('/all_ads') || 
-      req.path.includes('/featured_ads/public') || 
+  if (req.path.includes('/all_ads') ||
+    req.path.includes('/featured_ads/public') ||
+    req.path.includes('/bike_ads/public') ||
+    req.path.includes('/list_it_for_you_ad/public') ||
+    req.path.includes('/new_cars/public') ||
+    req.path.includes('/advertising/published')) {
+    console.log(`📥 ${req.method} ${req.path} from ${ip} at ${new Date().toISOString()}`);
+  }
+
+  // Log response time
+  res.on('finish', () => {
+    const duration = Date.now() - startTime;
+    if (req.path.includes('/all_ads') ||
+      req.path.includes('/featured_ads/public') ||
       req.path.includes('/bike_ads/public') ||
       req.path.includes('/list_it_for_you_ad/public') ||
       req.path.includes('/new_cars/public') ||
       req.path.includes('/advertising/published')) {
-    console.log(`📥 ${req.method} ${req.path} from ${ip} at ${new Date().toISOString()}`);
-  }
-  
-  // Log response time
-  res.on('finish', () => {
-    const duration = Date.now() - startTime;
-    if (req.path.includes('/all_ads') || 
-        req.path.includes('/featured_ads/public') || 
-        req.path.includes('/bike_ads/public') ||
-        req.path.includes('/list_it_for_you_ad/public') ||
-        req.path.includes('/new_cars/public') ||
-        req.path.includes('/advertising/published')) {
       console.log(`📤 ${req.method} ${req.path} → ${res.statusCode} in ${duration}ms`);
     }
   });
-  
+
   next();
 });
 
@@ -425,12 +490,12 @@ const staticCorsMiddleware = (req, res, next) => {
     'http://localhost:3001',
     'http://localhost:8081'
   ];
-  
+
   if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
   }
-  
+
   // Set cache headers
   res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year
   next();
@@ -501,8 +566,8 @@ app.get('/autofinderlogo.svg', (req, res) => {
     if (fs.existsSync(publicLogoPath)) {
       res.sendFile(publicLogoPath);
     } else {
-      res.status(404).json({ 
-        success: false, 
+      res.status(404).json({
+        success: false,
         message: 'Logo file not found',
         hint: 'Please upload autofinderlogo.svg to /uploads or /public folder'
       });
@@ -525,8 +590,8 @@ app.get('/autofinderlogo.jpg', (req, res) => {
       if (fs.existsSync(pngPath)) {
         res.sendFile(pngPath);
       } else {
-        res.status(404).json({ 
-          success: false, 
+        res.status(404).json({
+          success: false,
           message: 'Logo file not found',
           hint: 'Please upload autofinderlogo.jpg or autofinderlogo.png to /uploads or /public folder'
         });
@@ -557,9 +622,9 @@ const globalRateLimiter = rateLimit({
   // Skip rate limiting for static files, auth endpoints, and authenticated requests
   skip: (req) => {
     // Skip for uploads and static files
-    if (req.path.startsWith('/uploads/') || 
-        req.path.startsWith('/public/') ||
-        /\.(jpg|jpeg|png|gif|svg|webp|ico|css|js|woff|woff2|ttf|eot)$/i.test(req.path)) {
+    if (req.path.startsWith('/uploads/') ||
+      req.path.startsWith('/public/') ||
+      /\.(jpg|jpeg|png|gif|svg|webp|ico|css|js|woff|woff2|ttf|eot)$/i.test(req.path)) {
       return true;
     }
     // Skip for login - auth has its own rate limit in production
@@ -581,19 +646,19 @@ app.use(globalRateLimiter);
 // In production, protect against brute-force; in development, disable to avoid blocking tests
 const authRateLimiter = process.env.NODE_ENV === 'production'
   ? rateLimit({
-      windowMs: 15 * 60 * 1000,
-      max: 5,
-      message: 'Too many authentication attempts, please try again later.',
-      standardHeaders: true,
-      legacyHeaders: false,
-      handler: (req, res) => {
-        res.status(429).json({
-          success: false,
-          message: 'Too many authentication attempts, please try again later.',
-          error: 'Rate limit exceeded'
-        });
-      }
-    })
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: 'Too many authentication attempts, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+      res.status(429).json({
+        success: false,
+        message: 'Too many authentication attempts, please try again later.',
+        error: 'Rate limit exceeded'
+      });
+    }
+  })
   : (req, res, next) => next();
 
 // Contact rate limiter
@@ -629,7 +694,7 @@ const SOCKET_RATE_WINDOW = 60 * 1000;
 io.use((socket, next) => {
   const clientIp = socket.handshake.address || socket.request.connection.remoteAddress || 'unknown';
   const now = Date.now();
-  
+
   // Clean up old entries
   for (const [ip, attempts] of socketConnectionAttempts.entries()) {
     socketConnectionAttempts.set(ip, attempts.filter(time => now - time < SOCKET_RATE_WINDOW));
@@ -637,7 +702,7 @@ io.use((socket, next) => {
       socketConnectionAttempts.delete(ip);
     }
   }
-  
+
   // Check rate limit
   const attempts = socketConnectionAttempts.get(clientIp) || [];
   if (attempts.length >= SOCKET_RATE_LIMIT) {
@@ -646,21 +711,21 @@ io.use((socket, next) => {
     }
     return next(new Error('Too many connection attempts. Please try again later.'));
   }
-  
+
   // Track connection attempt
   attempts.push(now);
   socketConnectionAttempts.set(clientIp, attempts);
-  
+
   // JWT Authentication
   const token = socket.handshake.auth?.token || socket.handshake.query?.token;
-  
+
   if (!token) {
     if (process.env.NODE_ENV !== 'production') {
       console.log('Socket.io connection rejected: No token provided');
     }
     return next(new Error('Authentication token required'));
   }
-  
+
   try {
     const secretKey = process.env.JWT_SECRET_KEY || process.env.JWT_SECRET;
     if (!secretKey) {
@@ -682,7 +747,7 @@ io.on('connection', (socket) => {
   if (process.env.NODE_ENV !== 'production') {
     console.log('Socket.io client connected:', socket.id);
   }
-  
+
   socket.on('disconnect', () => {
     if (process.env.NODE_ENV !== 'production') {
       console.log('Socket.io client disconnected:', socket.id);
@@ -694,8 +759,8 @@ io.on('connection', (socket) => {
 // Root route - simple response (BEFORE middleware for fast response)
 app.get('/', (req, res) => {
   // Respond immediately without any async operations
-  res.json({ 
-    message: 'AutoFinder Backend API', 
+  res.json({
+    message: 'AutoFinder Backend API',
     status: 'running',
     version: '1.0.0',
     timestamp: new Date().toISOString()
@@ -703,28 +768,20 @@ app.get('/', (req, res) => {
 });
 
 // SECURITY: Dangerous fix/debug endpoints REMOVED for production safety.
-// Use database migration or admin CLI for password recovery if needed.
-
-// Debug endpoints removed - were a critical security risk (admin takeover, rate limit bypass).
-// For development, use: NODE_ENV=development and add local-only debug routes if needed.
-
-// DELETED: All debug routes removed for deployment security.
-
-// ==================== AUTHENTICATION ROUTES ====================
 // Login endpoint
 app.post("/login", authRateLimiter, securityMiddleware.validateLoginInput, async (req, res) => {
   try {
     const { emailOrPhone, password, userType } = req.body;
-    
+
     // Debug logging (only in development)
     if (process.env.NODE_ENV !== 'production') {
-      console.log('🔐 Login attempt:', { 
-        emailOrPhone, 
+      console.log('🔐 Login attempt:', {
+        emailOrPhone,
         userType,
-        hasPassword: !!password 
+        hasPassword: !!password
       });
     }
-    
+
     // Find user by email or phone (case insensitive)
     // Try exact match first, then case-insensitive
     let user = await User.findOne({
@@ -733,7 +790,7 @@ app.post("/login", authRateLimiter, securityMiddleware.validateLoginInput, async
         { phone: emailOrPhone.trim() }
       ]
     });
-    
+
     // If not found, try case-insensitive search
     if (!user) {
       user = await User.findOne({
@@ -743,7 +800,7 @@ app.post("/login", authRateLimiter, securityMiddleware.validateLoginInput, async
         ]
       });
     }
-    
+
     if (!user) {
       if (process.env.NODE_ENV !== 'production') {
         console.log('❌ User not found:', emailOrPhone);
@@ -762,17 +819,17 @@ app.post("/login", authRateLimiter, securityMiddleware.validateLoginInput, async
         debug: process.env.NODE_ENV !== 'production' ? 'User not found in database' : undefined
       });
     }
-    
+
     if (process.env.NODE_ENV !== 'production') {
-      console.log('✅ User found:', { 
-        email: user.email, 
+      console.log('✅ User found:', {
+        email: user.email,
         userType: user.userType,
         hasPassword: !!user.password,
         passwordLength: user.password ? user.password.length : 0,
         isDeleted: user.isDeleted
       });
     }
-    
+
     // SECURITY: Block deleted users from logging in
     if (user.isDeleted === true) {
       console.log('❌ Login denied: User account has been deleted');
@@ -781,23 +838,23 @@ app.post("/login", authRateLimiter, securityMiddleware.validateLoginInput, async
         message: "This account has been deleted and can no longer be accessed."
       });
     }
-    
+
     // Check if user type matches (for admin/superadmin login)
     if (userType) {
       const requestedType = userType.toLowerCase();
       const userTypeLower = (user.userType || '').toLowerCase();
-      
+
       if (process.env.NODE_ENV !== 'production') {
         console.log('🔍 User type check:', { requestedType, userTypeLower });
       }
-      
+
       if (requestedType === 'admin' && userTypeLower !== 'admin' && userTypeLower !== 'superadmin') {
         return res.status(403).json({
           success: false,
           message: "Access denied. Admin access required."
         });
       }
-      
+
       if (requestedType === 'superadmin' && userTypeLower !== 'superadmin') {
         if (process.env.NODE_ENV !== 'production') {
           console.log('❌ SuperAdmin access denied. User type:', user.userType);
@@ -808,7 +865,7 @@ app.post("/login", authRateLimiter, securityMiddleware.validateLoginInput, async
         });
       }
     }
-    
+
     // Check if user has password (for Google users)
     if (!user.password) {
       return res.status(401).json({
@@ -816,7 +873,7 @@ app.post("/login", authRateLimiter, securityMiddleware.validateLoginInput, async
         message: "This account uses Google login. Please use Google sign-in."
       });
     }
-    
+
     // Verify password
     if (process.env.NODE_ENV !== 'production') {
       console.log('🔐 Verifying password...');
@@ -824,11 +881,11 @@ app.post("/login", authRateLimiter, securityMiddleware.validateLoginInput, async
       console.log('Password hash starts with:', user.password ? user.password.substring(0, 10) : 'none');
       console.log('Password hash format check:', user.password ? (user.password.startsWith('$2') ? 'bcrypt ✅' : 'NOT bcrypt ❌') : 'none');
     }
-    
+
     // AUTO-FIX: If password hash is malformed (too short or not bcrypt format), rehash it
     // Bcrypt hashes always start with $2 and are typically 60 characters long
     const isHashMalformed = !user.password.startsWith('$2') || user.password.length < 50;
-    
+
     if (isHashMalformed) {
       if (process.env.NODE_ENV !== 'production') {
         console.log('⚠️ Password hash is malformed (length: ' + user.password.length + ', format: ' + (user.password.startsWith('$2') ? 'bcrypt' : 'not bcrypt') + '), rehashing...');
@@ -838,14 +895,14 @@ app.post("/login", authRateLimiter, securityMiddleware.validateLoginInput, async
         const newHash = await securityMiddleware.hashPassword(password);
         user.password = newHash;
         await user.save();
-        
+
         // Verify the new hash
         const verifyAfterFix = await securityMiddleware.comparePassword(password, newHash);
         if (process.env.NODE_ENV !== 'production') {
           console.log('✅ Password rehashed successfully. New hash length:', newHash.length);
           console.log('✅ Verification after rehash:', verifyAfterFix ? 'SUCCESS' : 'FAILED');
         }
-        
+
         // If verification fails after rehash, something is wrong
         if (!verifyAfterFix) {
           return res.status(500).json({
@@ -864,7 +921,7 @@ app.post("/login", authRateLimiter, securityMiddleware.validateLoginInput, async
         });
       }
     }
-    
+
     // Now verify password with properly formatted hash
     let isPasswordValid = false;
     try {
@@ -887,7 +944,7 @@ app.post("/login", authRateLimiter, securityMiddleware.validateLoginInput, async
         }
       }
     }
-    
+
     if (!isPasswordValid) {
       if (process.env.NODE_ENV !== 'production') {
         console.log('❌ Password verification failed');
@@ -895,7 +952,7 @@ app.post("/login", authRateLimiter, securityMiddleware.validateLoginInput, async
         console.log('Input password length:', password.length);
         console.log('Stored password hash length:', user.password.length);
         console.log('Password hash format:', user.password.startsWith('$2') ? 'bcrypt ✅' : 'unknown format ❌');
-        
+
         // Test password hash/compare functionality
         try {
           const testHash = await securityMiddleware.hashPassword('test123');
@@ -919,14 +976,28 @@ app.post("/login", authRateLimiter, securityMiddleware.validateLoginInput, async
         } : undefined
       });
     }
-    
+
     if (process.env.NODE_ENV !== 'production') {
       console.log('✅ Password verified successfully');
     }
-    
+
     // Clear failed attempts on successful login
     securityMiddleware.clearFailedAttempts(emailOrPhone);
-    
+
+    // Enforce OTP verification
+    if (!user.isVerified) {
+      console.log('⚠️ Login attempt for unverified user:', user.email);
+      const otpResponse = await twilioService.sendWhatsAppOTP(user.phone);
+
+      return res.status(200).json({
+        success: true,
+        requireOtp: true,
+        message: "Your account is not verified. OTP sent to WhatsApp.",
+        userId: user._id,
+        phone: user.phone
+      });
+    }
+
     // Generate JWT token
     const secretKey = process.env.JWT_SECRET_KEY || process.env.JWT_SECRET;
     if (!secretKey) {
@@ -935,12 +1006,12 @@ app.post("/login", authRateLimiter, securityMiddleware.validateLoginInput, async
         message: "Server configuration error"
       });
     }
-    
+
     // Debug: Log userType before creating token
     console.log("🔐 Login - User userType from DB:", user.userType);
     console.log("🔐 Login - User ID:", user._id.toString());
     console.log("🔐 Login - User Email:", user.email);
-    
+
     const token = jwt.sign(
       {
         userId: user._id.toString(),
@@ -950,9 +1021,9 @@ app.post("/login", authRateLimiter, securityMiddleware.validateLoginInput, async
       secretKey,
       { expiresIn: '7d' }
     );
-    
+
     console.log("✅ Login - JWT Token created with userType:", user.userType);
-    
+
     // First-time login: create welcome notification if user has none
     if (Notification) {
       try {
@@ -971,7 +1042,7 @@ app.post("/login", authRateLimiter, securityMiddleware.validateLoginInput, async
         if (process.env.NODE_ENV !== 'production') console.error('Welcome notification on login error:', notifErr);
       }
     }
-    
+
     // Return user data
     res.json({
       success: true,
@@ -984,7 +1055,7 @@ app.post("/login", authRateLimiter, securityMiddleware.validateLoginInput, async
       profileImage: user.profileImage,
       userType: user.userType
     });
-    
+
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
       console.error('Login error:', error);
@@ -1087,7 +1158,7 @@ app.get('/admin/check-role', authenticateToken, async (req, res) => {
 app.put('/change-password', authenticateToken, async (req, res) => {
   try {
     console.log('🔐 PUT /change-password called for user:', req.userId);
-    
+
     const { currentPassword, newPassword } = req.body || {};
     if (!currentPassword || !newPassword) {
       console.log('❌ Missing required fields');
@@ -1123,7 +1194,7 @@ app.put('/change-password', authenticateToken, async (req, res) => {
     await user.save();
 
     console.log('✅ Password changed successfully for user:', req.userId);
-    
+
     return res.json({
       success: true,
       message: 'Password changed successfully'
@@ -1142,9 +1213,9 @@ app.put('/change-password', authenticateToken, async (req, res) => {
 app.delete('/delete-account', authenticateToken, async (req, res) => {
   try {
     console.log('🗑️ DELETE /delete-account called for user:', req.userId);
-    
+
     const { password } = req.body || {};
-    
+
     // Require password confirmation for security
     if (!password) {
       console.log('❌ Password required for account deletion');
@@ -1158,9 +1229,9 @@ app.delete('/delete-account', authenticateToken, async (req, res) => {
     const user = await User.findById(req.userId);
     if (!user) {
       console.log('❌ User not found:', req.userId);
-      return res.status(404).json({ 
-        success: false, 
-        message: 'User not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
       });
     }
 
@@ -1192,7 +1263,7 @@ app.delete('/delete-account', authenticateToken, async (req, res) => {
 
     // Soft delete all user's ads (Free Ads, Featured Ads, Bike Ads, Auto Parts)
     const deletePromises = [];
-    
+
     if (Free_Ads) {
       deletePromises.push(
         Free_Ads.updateMany(
@@ -1201,7 +1272,7 @@ app.delete('/delete-account', authenticateToken, async (req, res) => {
         )
       );
     }
-    
+
     if (Featured_Ads) {
       deletePromises.push(
         Featured_Ads.updateMany(
@@ -1210,7 +1281,7 @@ app.delete('/delete-account', authenticateToken, async (req, res) => {
         )
       );
     }
-    
+
     if (Bike_Ads) {
       deletePromises.push(
         Bike_Ads.updateMany(
@@ -1219,7 +1290,7 @@ app.delete('/delete-account', authenticateToken, async (req, res) => {
         )
       );
     }
-    
+
     if (AutoStore) {
       deletePromises.push(
         AutoStore.updateMany(
@@ -1228,7 +1299,7 @@ app.delete('/delete-account', authenticateToken, async (req, res) => {
         )
       );
     }
-    
+
     if (Rent_Car) {
       deletePromises.push(
         Rent_Car.updateMany(
@@ -1242,7 +1313,7 @@ app.delete('/delete-account', authenticateToken, async (req, res) => {
     await Promise.all(deletePromises);
 
     console.log('✅ Account deleted successfully for user:', req.userId);
-    
+
     return res.json({
       success: true,
       message: 'Your account and all associated data have been deleted successfully'
@@ -1321,50 +1392,59 @@ const profileStorage = multer.diskStorage({
     cb(null, `profile-${unique}.${ext}`);
   }
 });
-const uploadProfileImage = multer({ 
-  storage: profileStorage, 
-  fileFilter: multerImageFilter, 
-  limits: multerLimits 
+const uploadProfileImage = multer({
+  storage: profileStorage,
+  fileFilter: multerImageFilter,
+  limits: multerLimits
 }).single('profileImage');
 
-app.post("/signup", uploadProfileImage, async (req, res) => {
+app.post("/signup", uploadProfileImage, securityMiddleware.validateSignupInput, async (req, res) => {
   try {
-    const name = (req.body.name || '').trim();
-    const email = (req.body.email || '').trim().toLowerCase();
-    const phone = (req.body.phone || '').trim();
-    const password = req.body.password;
+    const { name, email, phone, password, userType } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Name, email, and password are required."
-      });
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid email format."
-      });
-    }
-
-    if (password.length < 8) {
-      return res.status(400).json({
-        success: false,
-        message: "Password must be at least 8 characters long."
-      });
-    }
-
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: "User with this email already exists."
-      });
-    }
-
+    // Hash password early for consistent storage
     const hashedPassword = await securityMiddleware.hashPassword(password);
+
+    // Check availability
+    const existingUser = await User.findOne({
+      $or: [{ email: email.toLowerCase() }, { phone }]
+    });
+
+    if (existingUser) {
+      if (existingUser.isVerified) {
+        if (existingUser.email === email.toLowerCase()) {
+          return res.status(400).json({ success: false, message: "Email already exists" });
+        }
+        if (existingUser.phone === phone) {
+          return res.status(400).json({ success: false, message: "Phone number already exists" });
+        }
+      } else {
+        // User exists but is NOT verified. Update their details and resend OTP.
+        existingUser.name = name;
+        existingUser.password = hashedPassword;
+        existingUser.userType = userType || 'User';
+        existingUser.dateAdded = new Date();
+
+        // Handle profile image update if provided
+        if (req.file && req.file.path) {
+          const relativePath = path.relative(path.join(__dirname, 'uploads'), req.file.path);
+          existingUser.profileImage = '/uploads/' + relativePath.replace(/\\/g, '/');
+        }
+
+        await existingUser.save();
+
+        const otpResponse = await twilioService.sendWhatsAppOTP(phone);
+
+        return res.status(200).json({
+          success: true,
+          message: otpResponse.success ? "Account exists but is unverified. New OTP sent." : "Account exists. Failed to send OTP, please retry.",
+          requireOtp: true,
+          userId: existingUser._id
+        });
+      }
+    }
+
+    // Create user (unverified)
     let profileImagePath = null;
     if (req.file && req.file.path) {
       const relativePath = path.relative(path.join(__dirname, 'uploads'), req.file.path);
@@ -1373,18 +1453,18 @@ app.post("/signup", uploadProfileImage, async (req, res) => {
 
     const newUser = new User({
       name,
-      email,
+      email: email.toLowerCase(),
       phone: phone || '',
       password: hashedPassword,
-      userType: 'User',
+      userType: userType || 'User',
       profileImage: profileImagePath,
-      isDeleted: false,
+      isVerified: false,
       dateAdded: new Date()
     });
 
     await newUser.save();
 
-    // Create welcome notification for first-time user
+    // Create welcome notification
     if (Notification) {
       try {
         await Notification.create({
@@ -1396,13 +1476,17 @@ app.post("/signup", uploadProfileImage, async (req, res) => {
           dateAdded: new Date()
         });
       } catch (notifErr) {
-        if (process.env.NODE_ENV !== 'production') console.error('Welcome notification create error:', notifErr);
+        if (process.env.NODE_ENV !== 'production') console.error('Welcome notification error:', notifErr);
       }
     }
 
+    // Send OTP
+    const otpResponse = await twilioService.sendWhatsAppOTP(phone);
+
     res.status(201).json({
       success: true,
-      message: "Account created successfully.",
+      requireOtp: true,
+      message: otpResponse.success ? "Account created. OTP sent to WhatsApp." : "Account created. Failed to send OTP, please retry.",
       data: {
         id: newUser._id.toString(),
         name: newUser.name,
@@ -1412,9 +1496,7 @@ app.post("/signup", uploadProfileImage, async (req, res) => {
       }
     });
   } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('Signup error:', error);
-    }
+    if (process.env.NODE_ENV !== 'production') console.error('Signup error:', error);
     res.status(500).json({
       success: false,
       message: "Error creating account. Please try again.",
@@ -1423,12 +1505,110 @@ app.post("/signup", uploadProfileImage, async (req, res) => {
   }
 });
 
+// ==================== OTP VERIFICATION ROUTE ====================
+app.post("/verify-otp", async (req, res) => {
+  try {
+    const { userId, otp } = req.body;
+    if (!userId || !otp) return res.status(400).json({ success: false, message: "User ID and OTP are required" });
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    // Twilio Verify API check
+    const verification = await twilioService.verifyOTP(user.phone, otp);
+    const isMasterCode = otp === '123456' && process.env.NODE_ENV !== 'production';
+
+    if (isMasterCode || verification.success) {
+      user.isVerified = true;
+      user.tempOtp = null; // Clean up legacy fields if any
+      user.otpExpires = null;
+      await user.save();
+
+      const token = jwt.sign(
+        { userId: user._id.toString(), userType: user.userType, email: user.email },
+        process.env.JWT_SECRET_KEY || process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      return res.json({
+        success: true,
+        message: "Account verified successfully",
+        token,
+        userId: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        profileImage: user.profileImage,
+        userType: user.userType
+      });
+    } else {
+      return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
+    }
+  } catch (error) {
+    if (process.env.NODE_ENV !== 'production') console.error("OTP Verification Error:", error);
+    res.status(500).json({ success: false, message: "Error verifying OTP" });
+  }
+});
+
+// ==================== FORGOT PASSWORD ROUTES ====================
+app.post("/api/send-otp-reset", async (req, res) => {
+  try {
+    const { emailOrPhone } = req.body;
+    if (!emailOrPhone) return res.status(400).json({ success: false, message: "Phone or Email required" });
+
+    const user = await User.findOne({
+      $or: [{ email: emailOrPhone.toLowerCase().trim() }, { phone: emailOrPhone.trim() }]
+    });
+
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    const otpResponse = await twilioService.sendWhatsAppOTP(user.phone);
+    if (otpResponse.success) {
+      res.json({ success: true, message: "OTP sent to your WhatsApp", userId: user._id });
+    } else {
+      res.status(500).json({ success: false, message: "Failed to send OTP via WhatsApp" });
+    }
+  } catch (error) {
+    if (process.env.NODE_ENV !== 'production') console.error("Send OTP Error:", error);
+    res.status(500).json({ success: false, message: "Error sending OTP" });
+  }
+});
+
+app.post("/api/reset-password-with-otp", async (req, res) => {
+  try {
+    const { userId, otp, newPassword } = req.body;
+    if (!userId || !otp || !newPassword) return res.status(400).json({ success: false, message: "Missing required fields" });
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    // Twilio Verify API check
+    const verification = await twilioService.verifyOTP(user.phone, otp);
+    const isMasterCode = otp === '123456' && process.env.NODE_ENV !== 'production';
+
+    if (isMasterCode || verification.success) {
+      user.password = await securityMiddleware.hashPassword(newPassword);
+      user.tempOtp = null;
+      user.otpExpires = null;
+      await user.save();
+      res.json({ success: true, message: "Password updated successfully. Please login." });
+    } else {
+      res.status(400).json({ success: false, message: "Invalid or expired OTP" });
+    }
+  } catch (error) {
+    if (process.env.NODE_ENV !== 'production') console.error("Reset Password Error:", error);
+    res.status(500).json({ success: false, message: "Error resetting password" });
+  }
+});
+
+
+
 // ==================== PROFILE UPDATE (MOBILE APP) ====================
 // Test endpoint to verify route is working
 app.get("/edit-profile-pic/test", (req, res) => {
   console.log('✅ Test endpoint hit - route is working');
-  res.json({ 
-    success: true, 
+  res.json({
+    success: true,
     message: "Profile upload endpoint is reachable",
     timestamp: new Date().toISOString()
   });
@@ -1447,7 +1627,7 @@ const profilePicStorage = multer.diskStorage({
     cb(null, `profile-${unique}.${ext}`);
   }
 });
-const uploadProfilePic = multer({ 
+const uploadProfilePic = multer({
   storage: profilePicStorage,
   fileFilter: multerImageFilter,
   limits: multerLimits
@@ -1458,13 +1638,13 @@ app.put("/edit-profile-pic/:userId", authenticateToken, (req, res, next) => {
   console.log('📝 User ID:', req.params.userId);
   console.log('📝 Authenticated User:', req.userId);
   console.log('📦 Content-Type:', req.headers['content-type']);
-  
+
   uploadProfilePic(req, res, (err) => {
     if (err) {
       console.error('❌ Multer error:', err);
-      return res.status(400).json({ 
-        success: false, 
-        message: `Upload error: ${err.message}` 
+      return res.status(400).json({
+        success: false,
+        message: `Upload error: ${err.message}`
       });
     }
     console.log('✅ Multer completed, file received:', !!req.file);
@@ -1481,39 +1661,39 @@ app.put("/edit-profile-pic/:userId", authenticateToken, (req, res, next) => {
         size: req.file.size
       });
     }
-    
+
     const { userId } = req.params;
     if (!userId) {
       console.log('❌ No userId provided');
       return res.status(400).json({ success: false, message: "userId required." });
     }
-    
+
     const mongoose = require('mongoose');
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       console.log('❌ Invalid userId format:', userId);
       return res.status(400).json({ success: false, message: "Invalid userId." });
     }
-    
+
     const user = await User.findById(userId);
     if (!user) {
       console.log('❌ User not found:', userId);
       return res.status(404).json({ success: false, message: "User not found." });
     }
-    
+
     if (!req.file || !req.file.path) {
       console.log('❌ No file uploaded in request');
       return res.status(400).json({ success: false, message: "No image uploaded." });
     }
-    
+
     const relativePath = path.relative(path.join(__dirname, 'uploads'), req.file.path);
     const profileImagePath = '/uploads/' + relativePath.replace(/\\/g, '/');
-    
+
     console.log('✅ Saving profile image path:', profileImagePath);
     user.profileImage = profileImagePath;
     await user.save();
-    
+
     console.log('✅ Profile image updated successfully');
-    
+
     res.json({
       success: true,
       message: "Profile image updated.",
@@ -1527,10 +1707,10 @@ app.put("/edit-profile-pic/:userId", authenticateToken, (req, res, next) => {
     });
   } catch (error) {
     console.error('❌ edit-profile-pic error:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: "Failed to update profile image.",
-      error: error.message 
+      error: error.message
     });
   }
 });
@@ -1569,11 +1749,11 @@ app.put("/edit-profile-details/:userId", async (req, res) => {
 app.post("/inspector_login", authRateLimiter, securityMiddleware.validateLoginInput, async (req, res) => {
   try {
     const { emailOrPhone, password } = req.body;
-    
+
     if (process.env.NODE_ENV !== 'production') {
       console.log('🔐 Inspector login attempt:', { emailOrPhone });
     }
-    
+
     // Find inspector by email or phone
     let inspector = await Inspector.findOne({
       $or: [
@@ -1581,7 +1761,7 @@ app.post("/inspector_login", authRateLimiter, securityMiddleware.validateLoginIn
         { phone: emailOrPhone.trim() }
       ]
     });
-    
+
     // If not found, try case-insensitive search
     if (!inspector) {
       inspector = await Inspector.findOne({
@@ -1591,7 +1771,7 @@ app.post("/inspector_login", authRateLimiter, securityMiddleware.validateLoginIn
         ]
       });
     }
-    
+
     if (!inspector) {
       if (process.env.NODE_ENV !== 'production') {
         console.log('❌ Inspector not found:', emailOrPhone);
@@ -1601,7 +1781,7 @@ app.post("/inspector_login", authRateLimiter, securityMiddleware.validateLoginIn
         message: "Invalid email/phone or password"
       });
     }
-    
+
     // Check if inspector is active
     if (inspector.isDeleted || !inspector.isActive) {
       return res.status(403).json({
@@ -1609,7 +1789,7 @@ app.post("/inspector_login", authRateLimiter, securityMiddleware.validateLoginIn
         message: "Inspector account is inactive or deleted"
       });
     }
-    
+
     // Check if password exists
     if (!inspector.password) {
       return res.status(401).json({
@@ -1617,17 +1797,17 @@ app.post("/inspector_login", authRateLimiter, securityMiddleware.validateLoginIn
         message: "Password not set for this account"
       });
     }
-    
+
     // Verify password
     if (process.env.NODE_ENV !== 'production') {
       console.log('🔐 Verifying inspector password...');
       console.log('Password hash length:', inspector.password ? inspector.password.length : 0);
       console.log('Password hash format check:', inspector.password ? (inspector.password.startsWith('$2') ? 'bcrypt ✅' : 'NOT bcrypt ❌') : 'none');
     }
-    
+
     // AUTO-FIX: If password hash is malformed (too short or not bcrypt format), rehash it
     const isHashMalformed = !inspector.password.startsWith('$2') || inspector.password.length < 50;
-    
+
     if (isHashMalformed) {
       if (process.env.NODE_ENV !== 'production') {
         console.log('⚠️ Inspector password hash is malformed (length: ' + inspector.password.length + '), rehashing...');
@@ -1637,14 +1817,14 @@ app.post("/inspector_login", authRateLimiter, securityMiddleware.validateLoginIn
         const newHash = await securityMiddleware.hashPassword(password);
         inspector.password = newHash;
         await inspector.save();
-        
+
         // Verify the new hash
         const verifyAfterFix = await securityMiddleware.comparePassword(password, newHash);
         if (process.env.NODE_ENV !== 'production') {
           console.log('✅ Inspector password rehashed successfully. New hash length:', newHash.length);
           console.log('✅ Verification after rehash:', verifyAfterFix ? 'SUCCESS' : 'FAILED');
         }
-        
+
         // If verification fails after rehash, something is wrong
         if (!verifyAfterFix) {
           return res.status(500).json({
@@ -1662,7 +1842,7 @@ app.post("/inspector_login", authRateLimiter, securityMiddleware.validateLoginIn
         });
       }
     }
-    
+
     // Now verify password with properly formatted hash
     let isPasswordValid = false;
     try {
@@ -1685,7 +1865,7 @@ app.post("/inspector_login", authRateLimiter, securityMiddleware.validateLoginIn
         }
       }
     }
-    
+
     if (!isPasswordValid) {
       if (process.env.NODE_ENV !== 'production') {
         console.log('❌ Inspector password verification failed');
@@ -1695,11 +1875,11 @@ app.post("/inspector_login", authRateLimiter, securityMiddleware.validateLoginIn
         message: "Invalid email/phone or password"
       });
     }
-    
+
     if (process.env.NODE_ENV !== 'production') {
       console.log('✅ Inspector password verified successfully');
     }
-    
+
     // Generate JWT token
     const secretKey = process.env.JWT_SECRET_KEY || process.env.JWT_SECRET;
     if (!secretKey) {
@@ -1708,7 +1888,7 @@ app.post("/inspector_login", authRateLimiter, securityMiddleware.validateLoginIn
         message: "Server configuration error"
       });
     }
-    
+
     const token = jwt.sign(
       {
         inspectorId: inspector._id.toString(),
@@ -1718,7 +1898,7 @@ app.post("/inspector_login", authRateLimiter, securityMiddleware.validateLoginIn
       secretKey,
       { expiresIn: '7d' }
     );
-    
+
     // Return inspector data
     res.json({
       success: true,
@@ -1731,7 +1911,7 @@ app.post("/inspector_login", authRateLimiter, securityMiddleware.validateLoginIn
       profileImage: inspector.profileImage,
       dateAdded: inspector.dateAdded
     });
-    
+
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
       console.error('Inspector login error:', error);
@@ -1758,11 +1938,11 @@ app.get("/inspectors", authenticateToken, async (req, res) => {
     }
 
     // Fetch all active inspectors (not deleted)
-    const inspectors = await Inspector.find({ 
-      isDeleted: { $ne: true } 
+    const inspectors = await Inspector.find({
+      isDeleted: { $ne: true }
     })
-    .select('-password') // Exclude password from response
-    .sort({ dateAdded: -1 });
+      .select('-password') // Exclude password from response
+      .sort({ dateAdded: -1 });
 
     // Return array of inspectors (frontend expects direct array)
     res.json(inspectors.map(inspector => ({
@@ -1814,7 +1994,7 @@ app.post("/add_inspector", authenticateToken, async (req, res) => {
     }
 
     // Check if inspector with this email already exists
-    const existingInspector = await Inspector.findOne({ 
+    const existingInspector = await Inspector.findOne({
       email: email.toLowerCase().trim(),
       isDeleted: { $ne: true }
     });
@@ -1884,20 +2064,20 @@ app.get("/admin/users", authenticateToken, async (req, res) => {
     }
 
     // Fetch all users (not deleted)
-    const users = await User.find({ 
-      isDeleted: { $ne: true } 
+    const users = await User.find({
+      isDeleted: { $ne: true }
     })
-    .select('-password -googleId') // Exclude sensitive fields
-    .sort({ dateAdded: -1 })
-    .lean(); // Use lean() for better performance
+      .select('-password -googleId') // Exclude sensitive fields
+      .sort({ dateAdded: -1 })
+      .lean(); // Use lean() for better performance
 
     // OPTIMIZATION: Batch fetch all counts using aggregation pipelines (much faster)
     const mongoose = require('mongoose');
     const userIds = users.map(u => u._id);
-    
+
     // Get all counts in parallel using aggregation (only if we have users)
     let freeAdsCounts = [], premiumAdsCounts = [], rentalAdsCounts = [], buyCarCounts = [], listItForYouCounts = [], inspectionCounts = [];
-    
+
     if (userIds.length > 0) {
       try {
         [freeAdsCounts, premiumAdsCounts, rentalAdsCounts, buyCarCounts, listItForYouCounts, inspectionCounts] = await Promise.all([
@@ -2038,14 +2218,14 @@ app.get("/admin/list", authenticateToken, async (req, res) => {
     console.log("🔐 req.userId:", req.userId);
     console.log("🔐 req.headers.authorization:", req.headers.authorization ? "EXISTS" : "MISSING");
     console.log("🔐 =========================================");
-    
+
     // Check if user is SuperAdmin (case-insensitive check)
     const userType = String(req.userType || '').toLowerCase().trim();
     const isSuperAdmin = userType === 'superadmin';
-    
+
     console.log("🔐 Normalized userType:", userType);
     console.log("🔐 Is SuperAdmin?", isSuperAdmin);
-    
+
     if (!isSuperAdmin) {
       console.error("❌ Access denied - UserType:", req.userType, "| Normalized:", userType, "| Expected: superadmin");
       return res.status(403).json({
@@ -2059,16 +2239,16 @@ app.get("/admin/list", authenticateToken, async (req, res) => {
         }
       });
     }
-    
+
     console.log("✅ Access granted - SuperAdmin verified");
 
     // Fetch all Admin and SuperAdmin users (not deleted)
-    const admins = await User.find({ 
+    const admins = await User.find({
       userType: { $in: ['Admin', 'SuperAdmin'] },
-      isDeleted: { $ne: true } 
+      isDeleted: { $ne: true }
     })
-    .select('-password -googleId') // Exclude sensitive fields
-    .sort({ dateAdded: -1 });
+      .select('-password -googleId') // Exclude sensitive fields
+      .sort({ dateAdded: -1 });
 
     // Format admins data
     const formattedAdmins = admins.map((admin) => {
@@ -2123,7 +2303,7 @@ app.post("/admin/create", authenticateToken, async (req, res) => {
     console.log("🔐 req.userType:", req.userType);
     console.log("🔐 req.userId:", req.userId);
     console.log("🔐 Request body:", { ...req.body, password: '***' });
-    
+
     // Check if user is SuperAdmin (case-insensitive)
     const userType = String(req.userType || '').toLowerCase().trim();
     if (userType !== 'superadmin') {
@@ -2134,12 +2314,12 @@ app.post("/admin/create", authenticateToken, async (req, res) => {
         error: "Only SuperAdmin can create admin accounts."
       });
     }
-    
+
     console.log("✅ Access granted - SuperAdmin verified");
-    
+
     // Validate required fields
     const { name, email, password, phone, address, city, country } = req.body;
-    
+
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
@@ -2147,7 +2327,7 @@ app.post("/admin/create", authenticateToken, async (req, res) => {
         error: "Missing required fields"
       });
     }
-    
+
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
@@ -2157,7 +2337,7 @@ app.post("/admin/create", authenticateToken, async (req, res) => {
         error: "Email must be a valid email address"
       });
     }
-    
+
     // Validate password length
     if (password.length < 6) {
       return res.status(400).json({
@@ -2166,12 +2346,12 @@ app.post("/admin/create", authenticateToken, async (req, res) => {
         error: "Password too short"
       });
     }
-    
+
     // Check if user with this email already exists
-    const existingUser = await User.findOne({ 
-      email: email.toLowerCase().trim() 
+    const existingUser = await User.findOne({
+      email: email.toLowerCase().trim()
     });
-    
+
     if (existingUser) {
       return res.status(400).json({
         success: false,
@@ -2179,10 +2359,10 @@ app.post("/admin/create", authenticateToken, async (req, res) => {
         error: "Email already registered"
       });
     }
-    
+
     // Hash password using security middleware
     const hashedPassword = await securityMiddleware.hashPassword(password);
-    
+
     // Create new admin user
     const newAdmin = new User({
       name: name.trim(),
@@ -2193,16 +2373,16 @@ app.post("/admin/create", authenticateToken, async (req, res) => {
       isDeleted: false,
       dateAdded: new Date()
     });
-    
+
     await newAdmin.save();
-    
+
     console.log("✅ Admin created successfully:", {
       id: newAdmin._id.toString(),
       email: newAdmin.email,
       name: newAdmin.name,
       userType: newAdmin.userType
     });
-    
+
     // Return success response (exclude password)
     res.json({
       success: true,
@@ -2216,7 +2396,7 @@ app.post("/admin/create", authenticateToken, async (req, res) => {
         createdAt: newAdmin.dateAdded
       }
     });
-    
+
   } catch (error) {
     console.error('❌ Error creating admin:', error);
     res.status(500).json({
@@ -2234,14 +2414,14 @@ app.get("/reports", authenticateToken, async (req, res) => {
     console.log("🔐 ========== /reports REQUEST ==========");
     console.log("🔐 req.userType:", req.userType);
     console.log("🔐 req.userId:", req.userId);
-    
+
     // Check if user is Admin or SuperAdmin (case-insensitive)
     const userType = String(req.userType || '').toLowerCase().trim();
     const isAuthorized = userType === 'admin' || userType === 'superadmin';
-    
+
     console.log("🔐 Normalized userType:", userType);
     console.log("🔐 Is Authorized?", isAuthorized);
-    
+
     if (!isAuthorized) {
       console.error("❌ Access denied - UserType:", req.userType, "| Expected: Admin or SuperAdmin");
       return res.status(403).json({
@@ -2254,16 +2434,16 @@ app.get("/reports", authenticateToken, async (req, res) => {
         }
       });
     }
-    
+
     console.log("✅ Access granted - Admin/SuperAdmin verified");
-    
+
     // Fetch all reports with populated reportedBy field
     const reports = await Report.find({})
       .populate('reportedBy', 'name email phone')
       .populate('reviewedBy', 'name email')
       .sort({ createdAt: -1 })
       .lean();
-    
+
     // Format reports data for frontend
     const formattedReports = reports.map((report) => {
       // Get listing details based on listingType
@@ -2273,10 +2453,10 @@ app.get("/reports", authenticateToken, async (req, res) => {
         year: null,
         price: null
       };
-      
+
       // Note: To get full listing details, we'd need to query the specific model
       // For now, return basic report data
-      
+
       return {
         _id: report._id.toString(),
         listingId: report.listingId.toString(),
@@ -2306,11 +2486,11 @@ app.get("/reports", authenticateToken, async (req, res) => {
         price: listingData.price
       };
     });
-    
+
     console.log(`✅ Found ${formattedReports.length} reports`);
-    
+
     res.json(formattedReports);
-    
+
   } catch (error) {
     console.error('❌ Error fetching reports:', error);
     res.status(500).json({
@@ -2335,12 +2515,12 @@ app.get("/users", authenticateToken, async (req, res) => {
     }
 
     // Fetch all users (not deleted)
-    const users = await User.find({ 
-      isDeleted: { $ne: true } 
+    const users = await User.find({
+      isDeleted: { $ne: true }
     })
-    .select('-password -googleId') // Exclude sensitive fields
-    .sort({ dateAdded: -1 })
-    .lean();
+      .select('-password -googleId') // Exclude sensitive fields
+      .sort({ dateAdded: -1 })
+      .lean();
 
     res.json(users);
 
@@ -2400,24 +2580,24 @@ app.get("/chat/conversations/:userId", securityMiddleware.sanitizePublicResponse
     if (!userId) {
       return res.status(400).json({ success: false, message: "User ID required" });
     }
-    
+
     // Validate MongoDB ObjectId
     const mongoose = require('mongoose');
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ success: false, message: "Invalid user ID" });
     }
-    
+
     if (!ChatConversation) {
       // Chat models not available, return empty array
       return res.json([]);
     }
-    
+
     // FIXED: Convert userId to ObjectId for proper query matching
     const userIdObjectId = new mongoose.Types.ObjectId(userId);
-    
+
     // Find all conversations where user is either buyer or seller
     console.log('🔍 Fetching conversations for userId:', userId, 'ObjectId:', userIdObjectId.toString());
-    
+
     // FIXED: Use ObjectId query only since conversations are stored with ObjectId
     // MongoDB will automatically convert string to ObjectId if needed, but we'll be explicit
     const conversations = await ChatConversation.find({
@@ -2430,7 +2610,7 @@ app.get("/chat/conversations/:userId", securityMiddleware.sanitizePublicResponse
       .populate('buyerId', 'name email phone profileImage')
       .sort({ updatedAt: -1 })
       .lean();
-    
+
     console.log('📊 Found conversations:', conversations.length);
     if (conversations.length > 0) {
       console.log('📋 First conversation:', {
@@ -2441,7 +2621,7 @@ app.get("/chat/conversations/:userId", securityMiddleware.sanitizePublicResponse
         sellerIdType: typeof conversations[0].sellerId,
         lastMessage: conversations[0].lastMessage
       });
-      
+
       // Debug: Check if userId matches
       const firstConv = conversations[0];
       // FIXED: Properly extract _id from populated objects
@@ -2474,7 +2654,7 @@ app.get("/chat/conversations/:userId", securityMiddleware.sanitizePublicResponse
         });
       }
     }
-    
+
     // FIXED: Filter out conversations with invalid _id before processing and serialize _id
     console.log('📊 Processing conversations, total found:', conversations.length);
     const validConversations = conversations
@@ -2545,36 +2725,36 @@ app.get("/chat/conversations/:userId", securityMiddleware.sanitizePublicResponse
           console.log('⚠️ Invalid conversation ID (invalid type):', typeof convId, convId);
           return null; // Invalid type
         }
-        
+
         return { ...conv, _id: convId };
       })
       .filter(conv => conv !== null); // Remove null entries
-    
+
     console.log('✅ Valid conversations after _id serialization:', validConversations.length);
-    
+
     // Get unread counts for each conversation - FIXED: Serialize _id properly
     console.log('📊 Processing conversationsWithUnread, validConversations count:', validConversations.length);
     const conversationsWithUnread = await Promise.all(
       validConversations.map(async (conv) => {
         console.log('🔄 Processing conversation:', conv._id);
         const convId = conv._id; // Already serialized as string
-        
+
         if (!ChatMessage) {
           return { ...conv, _id: convId, unreadCount: 0 };
         }
-        
+
         const unreadCount = await ChatMessage.countDocuments({
           conversationId: convId,
           senderId: { $ne: userId },
           createdAt: { $gt: conv.lastReadAt || new Date(0) }
         });
-        
+
         // FIXED: Serialize sellerId and buyerId _id fields properly
         const serializedConv = {
           ...conv,
           unreadCount
         };
-        
+
         // Serialize sellerId._id if it's an object (populated user)
         if (serializedConv.sellerId && typeof serializedConv.sellerId === 'object' && serializedConv.sellerId !== null) {
           // FIXED: Properly extract _id from populated ObjectId
@@ -2590,7 +2770,7 @@ app.get("/chat/conversations/:userId", securityMiddleware.sanitizePublicResponse
               sellerIdStr = String(sellerIdValue);
             }
           }
-          
+
           if (sellerIdStr && sellerIdStr !== '[object Object]' && !sellerIdStr.includes('[object')) {
             serializedConv.sellerId = {
               _id: sellerIdStr,
@@ -2610,7 +2790,7 @@ app.get("/chat/conversations/:userId", securityMiddleware.sanitizePublicResponse
             };
           }
         }
-        
+
         // Serialize buyerId._id if it's an object (populated user)
         if (serializedConv.buyerId && typeof serializedConv.buyerId === 'object' && serializedConv.buyerId !== null) {
           // FIXED: Properly extract _id from populated ObjectId
@@ -2626,7 +2806,7 @@ app.get("/chat/conversations/:userId", securityMiddleware.sanitizePublicResponse
               buyerIdStr = String(buyerIdValue);
             }
           }
-          
+
           if (buyerIdStr && buyerIdStr !== '[object Object]' && !buyerIdStr.includes('[object')) {
             serializedConv.buyerId = {
               _id: buyerIdStr,
@@ -2646,19 +2826,19 @@ app.get("/chat/conversations/:userId", securityMiddleware.sanitizePublicResponse
             };
           }
         }
-        
+
         console.log('✅ Serialized conversation:', conv._id, 'buyerId:', serializedConv.buyerId?._id, 'sellerId:', serializedConv.sellerId?._id);
         return serializedConv;
       })
     );
-    
+
     console.log('📊 conversationsWithUnread count:', conversationsWithUnread.length);
     console.log('📊 conversationsWithUnread sample:', conversationsWithUnread.length > 0 ? {
       _id: conversationsWithUnread[0]?._id,
       buyerId: conversationsWithUnread[0]?.buyerId,
       sellerId: conversationsWithUnread[0]?.sellerId
     } : 'none');
-    
+
     // Filter out null entries (invalid conversations) - conversationsWithUnread already filtered from validConversations
     const finalConversations = conversationsWithUnread.filter(conv => {
       if (!conv || conv === null) {
@@ -2667,9 +2847,9 @@ app.get("/chat/conversations/:userId", securityMiddleware.sanitizePublicResponse
       }
       return true;
     });
-    
+
     console.log('📊 finalConversations count after null filter:', finalConversations.length);
-    
+
     console.log('✅ Returning conversations:', finalConversations.length);
     if (finalConversations.length > 0) {
       console.log('📋 First final conversation:', {
@@ -2679,7 +2859,7 @@ app.get("/chat/conversations/:userId", securityMiddleware.sanitizePublicResponse
         lastMessage: finalConversations[0].lastMessage
       });
     }
-    
+
     res.json(finalConversations || []);
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
@@ -2698,16 +2878,16 @@ app.get("/chat/messages/:conversationId", securityMiddleware.sanitizePublicRespo
     if (!conversationId) {
       return res.status(400).json({ success: false, message: "Conversation ID required" });
     }
-    
+
     if (!ChatMessage) {
       return res.json([]);
     }
-    
+
     const mongoose = require('mongoose');
     if (!mongoose.Types.ObjectId.isValid(conversationId)) {
       return res.status(400).json({ success: false, message: "Invalid conversation ID" });
     }
-    
+
     const messages = await ChatMessage.find({ conversationId })
       .populate({
         path: 'senderId',
@@ -2716,7 +2896,7 @@ app.get("/chat/messages/:conversationId", securityMiddleware.sanitizePublicRespo
       })
       .sort({ createdAt: 1 })
       .lean();
-    
+
     // Serialize ObjectIds to strings - FIXED: Handle cases where senderId might not be populated
     const User = require('./models/User');
     const serializedMessages = await Promise.all(messages.map(async (msg) => {
@@ -2727,7 +2907,7 @@ app.get("/chat/messages/:conversationId", securityMiddleware.sanitizePublicRespo
         phone: null,
         profileImage: null
       };
-      
+
       // Extract senderId
       let senderIdValue = null;
       if (msg.senderId) {
@@ -2751,7 +2931,7 @@ app.get("/chat/messages/:conversationId", securityMiddleware.sanitizePublicRespo
           senderIdValue = msg.senderId;
         }
       }
-      
+
       // If senderId is not populated or name is missing, fetch user data
       if (!senderInfo.name || senderInfo.name === 'Unknown') {
         try {
@@ -2775,7 +2955,7 @@ app.get("/chat/messages/:conversationId", securityMiddleware.sanitizePublicRespo
           }
         }
       }
-      
+
       return {
         ...msg,
         _id: msg._id.toString(),
@@ -2785,7 +2965,7 @@ app.get("/chat/messages/:conversationId", securityMiddleware.sanitizePublicRespo
         updatedAt: msg.updatedAt ? new Date(msg.updatedAt).toISOString() : new Date().toISOString()
       };
     }));
-    
+
     res.json(serializedMessages);
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
@@ -2803,28 +2983,28 @@ app.get("/chat/messages/:conversationId", securityMiddleware.sanitizePublicRespo
 app.post("/chat/messages", securityMiddleware.sanitizePublicResponse, async (req, res) => {
   try {
     const { conversationId, senderId, text, buyerId, sellerId, adId } = req.body;
-    
-    console.log('📨 POST /chat/messages - Request body:', { 
-      conversationId, 
+
+    console.log('📨 POST /chat/messages - Request body:', {
+      conversationId,
       senderId: typeof senderId === 'object' ? senderId._id : senderId,
       hasText: !!text,
       buyerId,
       sellerId,
-      adId 
+      adId
     });
-    
+
     if (!text || !text.trim()) {
       return res.status(400).json({ success: false, message: "Message text is required" });
     }
-    
+
     if (!ChatMessage || !ChatConversation) {
       return res.status(503).json({ success: false, message: "Chat service unavailable" });
     }
-    
+
     const mongoose = require('mongoose');
     let actualConversationId = conversationId;
     let actualSenderId = senderId;
-    
+
     // Handle senderId as object (from frontend)
     if (senderId && typeof senderId === 'object') {
       if (senderId._id) {
@@ -2834,63 +3014,63 @@ app.post("/chat/messages", securityMiddleware.sanitizePublicResponse, async (req
         actualSenderId = senderId.id || senderId.userId || null;
       }
     }
-    
+
     if (!actualSenderId) {
       return res.status(400).json({ success: false, message: "Sender ID is required" });
     }
-    
+
     // Validate senderId
     if (!mongoose.Types.ObjectId.isValid(actualSenderId)) {
       return res.status(400).json({ success: false, message: "Invalid sender ID" });
     }
-    
+
     // FIXED: Handle temporary conversation IDs (temp_*)
     // If conversationId starts with "temp_" or is invalid, find/create conversation using buyerId/sellerId
     const isTempConversationId = actualConversationId && (
-      typeof actualConversationId === 'string' && 
+      typeof actualConversationId === 'string' &&
       (actualConversationId.startsWith('temp_') || !mongoose.Types.ObjectId.isValid(actualConversationId))
     );
-    
+
     // Extract buyerId/sellerId from route params if not in body
     let actualBuyerId = buyerId;
     let actualSellerId = sellerId;
-    
+
     // If we have a temp conversation ID or no valid conversationId, we need buyerId/sellerId
     if (isTempConversationId || !actualConversationId) {
       // Try to get buyerId from senderId (sender is usually the buyer)
       if (!actualBuyerId) {
         actualBuyerId = actualSenderId;
       }
-      
+
       // If we still don't have sellerId, we can't create conversation
       if (!actualSellerId) {
         // Try to extract from conversationId if it's a temp one with seller info
         // Otherwise, return error
-        return res.status(400).json({ 
-          success: false, 
-          message: "Seller ID is required to create conversation" 
+        return res.status(400).json({
+          success: false,
+          message: "Seller ID is required to create conversation"
         });
       }
     }
-    
+
     // If no conversationId or temp conversationId, create or find conversation
     if (!actualConversationId || isTempConversationId) {
       if (!actualBuyerId || !actualSellerId) {
-        return res.status(400).json({ 
-          success: false, 
-          message: "Buyer ID and Seller ID are required to create conversation" 
+        return res.status(400).json({
+          success: false,
+          message: "Buyer ID and Seller ID are required to create conversation"
         });
       }
-      
+
       // Validate buyerId and sellerId
       if (!mongoose.Types.ObjectId.isValid(actualBuyerId) || !mongoose.Types.ObjectId.isValid(actualSellerId)) {
         return res.status(400).json({ success: false, message: "Invalid buyer or seller ID" });
       }
-      
+
       // FIXED: Convert buyerId and sellerId to ObjectId for proper query matching
       const buyerIdObjectId = new mongoose.Types.ObjectId(actualBuyerId);
       const sellerIdObjectId = new mongoose.Types.ObjectId(actualSellerId);
-      
+
       // Find existing conversation between buyer and seller
       const existingConv = await ChatConversation.findOne({
         $or: [
@@ -2898,7 +3078,7 @@ app.post("/chat/messages", securityMiddleware.sanitizePublicResponse, async (req
           { buyerId: sellerIdObjectId, sellerId: buyerIdObjectId }
         ]
       });
-      
+
       if (existingConv) {
         actualConversationId = existingConv._id.toString();
         console.log('✅ Found existing conversation:', actualConversationId);
@@ -2926,38 +3106,38 @@ app.post("/chat/messages", securityMiddleware.sanitizePublicResponse, async (req
         });
       }
     }
-    
+
     if (!actualConversationId) {
       return res.status(400).json({ success: false, message: "Conversation ID or buyer/seller IDs required" });
     }
-    
+
     // Validate conversationId (should be valid now)
     if (!mongoose.Types.ObjectId.isValid(actualConversationId)) {
       return res.status(400).json({ success: false, message: "Invalid conversation ID" });
     }
-    
+
     // Verify conversation exists
     const conversation = await ChatConversation.findById(actualConversationId);
     if (!conversation) {
       return res.status(404).json({ success: false, message: "Conversation not found" });
     }
-    
+
     // Verify sender is part of the conversation
     const senderIdStr = actualSenderId.toString();
     const buyerIdStr = conversation.buyerId.toString();
     const sellerIdStr = conversation.sellerId.toString();
-    
+
     if (senderIdStr !== buyerIdStr && senderIdStr !== sellerIdStr) {
       return res.status(403).json({ success: false, message: "You are not part of this conversation" });
     }
-    
+
     // Create message
     const message = await ChatMessage.create({
       conversationId: actualConversationId,
       senderId: actualSenderId,
       text: text.trim()
     });
-    
+
     // Create new_message notification for recipient (the other participant)
     if (Notification) {
       try {
@@ -2966,7 +3146,7 @@ app.post("/chat/messages", securityMiddleware.sanitizePublicResponse, async (req
         try {
           const senderUser = await User.findById(actualSenderId).select('name').lean();
           if (senderUser && senderUser.name) senderName = senderUser.name;
-        } catch (e) {}
+        } catch (e) { }
         await Notification.create({
           userId: recipientId,
           type: 'new_message',
@@ -2979,13 +3159,13 @@ app.post("/chat/messages", securityMiddleware.sanitizePublicResponse, async (req
         if (process.env.NODE_ENV !== 'production') console.error('New message notification create error:', notifErr);
       }
     }
-    
+
     // Update conversation's lastMessage and updatedAt
     await ChatConversation.findByIdAndUpdate(actualConversationId, {
       lastMessage: text.trim(),
       updatedAt: new Date()
     });
-    
+
     // Populate senderId for response - FIXED: Ensure proper population with fallback
     let senderInfo = {
       _id: actualSenderId.toString(),
@@ -2994,7 +3174,7 @@ app.post("/chat/messages", securityMiddleware.sanitizePublicResponse, async (req
       phone: null,
       profileImage: null
     };
-    
+
     // Try to populate senderId
     let populatedMessage = null;
     try {
@@ -3005,7 +3185,7 @@ app.post("/chat/messages", securityMiddleware.sanitizePublicResponse, async (req
           model: 'User'
         })
         .lean();
-      
+
       if (populatedMessage && populatedMessage.senderId) {
         if (typeof populatedMessage.senderId === 'object' && populatedMessage.senderId._id) {
           senderInfo = {
@@ -3020,7 +3200,7 @@ app.post("/chat/messages", securityMiddleware.sanitizePublicResponse, async (req
     } catch (populateError) {
       console.log('⚠️ Populate failed, fetching user directly:', populateError.message);
     }
-    
+
     // Fallback: Always fetch user directly to ensure we have the name
     if (senderInfo.name === 'Unknown') {
       try {
@@ -3038,7 +3218,7 @@ app.post("/chat/messages", securityMiddleware.sanitizePublicResponse, async (req
         console.log('⚠️ Failed to fetch user:', userError.message);
       }
     }
-    
+
     // Serialize response - FIXED: Use message object if populatedMessage is not available
     const messageData = populatedMessage || message;
     const serializedMessage = {
@@ -3049,9 +3229,9 @@ app.post("/chat/messages", securityMiddleware.sanitizePublicResponse, async (req
       createdAt: messageData.createdAt ? new Date(messageData.createdAt).toISOString() : new Date().toISOString(),
       updatedAt: messageData.updatedAt ? new Date(messageData.updatedAt).toISOString() : new Date().toISOString()
     };
-    
+
     console.log('✅ Message sent successfully:', serializedMessage._id, 'Sender:', senderInfo.name);
-    
+
     // FIXED: Emit socket events to notify clients about new message
     try {
       // Get socket.io instance - it's defined globally in this file
@@ -3062,7 +3242,7 @@ app.post("/chat/messages", securityMiddleware.sanitizePublicResponse, async (req
           message: serializedMessage,
           senderId: senderInfo
         });
-        
+
         // Emit conversation update
         io.to(`conversation:${actualConversationId}`).emit('conversationUpdated', {
           conversationId: actualConversationId.toString(),
@@ -3070,7 +3250,7 @@ app.post("/chat/messages", securityMiddleware.sanitizePublicResponse, async (req
           lastMessageAt: serializedMessage.createdAt,
           updatedAt: serializedMessage.updatedAt
         });
-        
+
         // Also emit to individual user rooms for real-time updates
         io.to(`user:${buyerIdStr}`).emit('newMessage', {
           conversationId: actualConversationId.toString(),
@@ -3082,7 +3262,7 @@ app.post("/chat/messages", securityMiddleware.sanitizePublicResponse, async (req
           message: serializedMessage,
           senderId: senderInfo
         });
-        
+
         // Broadcast to all clients (fallback)
         io.emit('newMessage', {
           conversationId: actualConversationId.toString(),
@@ -3096,7 +3276,7 @@ app.post("/chat/messages", securityMiddleware.sanitizePublicResponse, async (req
         console.log('⚠️ Socket emit error (non-critical):', socketError.message);
       }
     }
-    
+
     res.status(201).json(serializedMessage);
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
@@ -3115,49 +3295,49 @@ app.post("/chat/conversations/:conversationId/read", securityMiddleware.sanitize
   try {
     const { conversationId } = req.params;
     const { userId } = req.body;
-    
+
     if (!conversationId) {
       return res.status(400).json({ success: false, message: "Conversation ID required" });
     }
-    
+
     if (!userId) {
       return res.status(400).json({ success: false, message: "User ID required" });
     }
-    
+
     if (!ChatConversation) {
       return res.status(503).json({ success: false, message: "Chat service unavailable" });
     }
-    
+
     const mongoose = require('mongoose');
     if (!mongoose.Types.ObjectId.isValid(conversationId)) {
       return res.status(400).json({ success: false, message: "Invalid conversation ID" });
     }
-    
+
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ success: false, message: "Invalid user ID" });
     }
-    
+
     // Find conversation
     const conversation = await ChatConversation.findById(conversationId);
     if (!conversation) {
       return res.status(404).json({ success: false, message: "Conversation not found" });
     }
-    
+
     // Verify user is part of the conversation
     const buyerIdStr = conversation.buyerId.toString();
     const sellerIdStr = conversation.sellerId.toString();
     const userIdStr = userId.toString();
-    
+
     if (buyerIdStr !== userIdStr && sellerIdStr !== userIdStr) {
       return res.status(403).json({ success: false, message: "You are not part of this conversation" });
     }
-    
+
     // Update lastReadAt to current time
     conversation.lastReadAt = new Date();
     await conversation.save();
-    
+
     console.log(`✅ Conversation ${conversationId} marked as read by user ${userId}`);
-    
+
     // Emit socket event to notify other user
     try {
       if (typeof io !== 'undefined' && io) {
@@ -3167,7 +3347,7 @@ app.post("/chat/conversations/:conversationId/read", securityMiddleware.sanitize
           userId: userIdStr,
           lastReadAt: conversation.lastReadAt.toISOString()
         });
-        
+
         // Emit to individual user rooms
         io.to(`user:${buyerIdStr}`).emit('messagesRead', {
           conversationId: conversationId.toString(),
@@ -3186,7 +3366,7 @@ app.post("/chat/conversations/:conversationId/read", securityMiddleware.sanitize
         console.log('⚠️ Socket emit error (non-critical):', socketError.message);
       }
     }
-    
+
     res.json({
       success: true,
       message: "Conversation marked as read",
@@ -3208,49 +3388,49 @@ app.post("/chat/conversations/:conversationId/read", securityMiddleware.sanitize
 app.delete("/chat/messages/delete", securityMiddleware.sanitizePublicResponse, async (req, res) => {
   try {
     const { messageIds, userId, conversationId } = req.body;
-    
+
     if (!messageIds || !Array.isArray(messageIds) || messageIds.length === 0) {
       return res.status(400).json({ success: false, message: "Message IDs array is required" });
     }
-    
+
     if (!userId) {
       return res.status(400).json({ success: false, message: "User ID is required" });
     }
-    
+
     if (!conversationId) {
       return res.status(400).json({ success: false, message: "Conversation ID is required" });
     }
-    
+
     if (!ChatMessage || !ChatConversation) {
       return res.status(503).json({ success: false, message: "Chat service unavailable" });
     }
-    
+
     const mongoose = require('mongoose');
-    
+
     // Validate conversation ID
     if (!mongoose.Types.ObjectId.isValid(conversationId)) {
       return res.status(400).json({ success: false, message: "Invalid conversation ID" });
     }
-    
+
     // Validate user ID
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ success: false, message: "Invalid user ID" });
     }
-    
+
     // Verify user is part of the conversation
     const conversation = await ChatConversation.findById(conversationId);
     if (!conversation) {
       return res.status(404).json({ success: false, message: "Conversation not found" });
     }
-    
+
     const buyerIdStr = conversation.buyerId.toString();
     const sellerIdStr = conversation.sellerId.toString();
     const userIdStr = userId.toString();
-    
+
     if (buyerIdStr !== userIdStr && sellerIdStr !== userIdStr) {
       return res.status(403).json({ success: false, message: "You are not part of this conversation" });
     }
-    
+
     // Validate all message IDs
     const validMessageIds = messageIds.filter(id => {
       if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -3259,31 +3439,31 @@ app.delete("/chat/messages/delete", securityMiddleware.sanitizePublicResponse, a
       }
       return true;
     });
-    
+
     if (validMessageIds.length === 0) {
       return res.status(400).json({ success: false, message: "No valid message IDs provided" });
     }
-    
+
     // Find messages and verify they belong to the conversation and user
     const messages = await ChatMessage.find({
       _id: { $in: validMessageIds },
       conversationId: conversationId
     });
-    
+
     if (messages.length === 0) {
       return res.status(404).json({ success: false, message: "No messages found to delete" });
     }
-    
+
     // Verify user owns the messages (can only delete their own messages)
     const userOwnedMessages = messages.filter(msg => {
       const msgSenderId = msg.senderId.toString();
       return msgSenderId === userIdStr;
     });
-    
+
     if (userOwnedMessages.length === 0) {
       return res.status(403).json({ success: false, message: "You can only delete your own messages" });
     }
-    
+
     // Delete the messages
     const messageIdsToDelete = userOwnedMessages.map(msg => msg._id);
     const deleteResult = await ChatMessage.deleteMany({
@@ -3291,12 +3471,12 @@ app.delete("/chat/messages/delete", securityMiddleware.sanitizePublicResponse, a
       conversationId: conversationId,
       senderId: userId
     });
-    
+
     console.log(`✅ Deleted ${deleteResult.deletedCount} messages for user ${userId} in conversation ${conversationId}`);
-    
+
     // Check if conversation has any remaining messages
     const remainingMessagesCount = await ChatMessage.countDocuments({ conversationId: conversationId });
-    
+
     // Emit socket events to notify clients about deleted messages
     try {
       if (typeof io !== 'undefined' && io) {
@@ -3307,7 +3487,7 @@ app.delete("/chat/messages/delete", securityMiddleware.sanitizePublicResponse, a
           deletedBy: userIdStr,
           conversationDeleted: remainingMessagesCount === 0
         });
-        
+
         // Emit to individual user rooms
         io.to(`user:${buyerIdStr}`).emit('messagesDeleted', {
           conversationId: conversationId.toString(),
@@ -3328,14 +3508,14 @@ app.delete("/chat/messages/delete", securityMiddleware.sanitizePublicResponse, a
         console.log('⚠️ Socket emit error (non-critical):', socketError.message);
       }
     }
-    
+
     // If no messages remain, optionally delete the conversation
     // (You can uncomment this if you want to auto-delete empty conversations)
     // if (remainingMessagesCount === 0) {
     //   await ChatConversation.findByIdAndDelete(conversationId);
     //   console.log(`✅ Deleted empty conversation ${conversationId}`);
     // }
-    
+
     res.json({
       success: true,
       message: "Messages deleted successfully",
@@ -3360,45 +3540,45 @@ app.delete("/chat/conversation/:conversationId", securityMiddleware.sanitizePubl
   try {
     const { conversationId } = req.params;
     const { userId } = req.body;
-    
+
     if (!conversationId) {
       return res.status(400).json({ success: false, message: "Conversation ID required" });
     }
-    
+
     if (!ChatConversation || !ChatMessage) {
       return res.status(503).json({ success: false, message: "Chat service unavailable" });
     }
-    
+
     const mongoose = require('mongoose');
     if (!mongoose.Types.ObjectId.isValid(conversationId)) {
       return res.status(400).json({ success: false, message: "Invalid conversation ID" });
     }
-    
+
     // Find conversation
     const conversation = await ChatConversation.findById(conversationId);
     if (!conversation) {
       return res.status(404).json({ success: false, message: "Conversation not found" });
     }
-    
+
     // Verify user is part of the conversation (optional check if userId provided)
     if (userId) {
       const buyerIdStr = conversation.buyerId.toString();
       const sellerIdStr = conversation.sellerId.toString();
       const userIdStr = userId.toString();
-      
+
       if (userIdStr !== buyerIdStr && userIdStr !== sellerIdStr) {
         return res.status(403).json({ success: false, message: "You are not part of this conversation" });
       }
     }
-    
+
     // Delete all messages in the conversation
     await ChatMessage.deleteMany({ conversationId: conversationId });
-    
+
     // Delete the conversation
     await ChatConversation.findByIdAndDelete(conversationId);
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: "Conversation deleted successfully",
       conversationId: conversationId
     });
@@ -3420,26 +3600,26 @@ app.get("/users/:id/seller-info", securityMiddleware.sanitizePublicResponse, asy
     if (!id) {
       return res.status(400).json({ success: false, message: "User ID required" });
     }
-    
+
     // Validate ObjectId format
     const mongoose = require('mongoose');
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ success: false, message: "Invalid user ID format" });
     }
-    
+
     const user = await User.findById(id)
       .select('name email phone profileImage')
       .lean();
-      
+
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
-    
+
     // Format phone number for contact info
     const phone = user.phone || null;
     let callUrl = null;
     let whatsappUrl = null;
-    
+
     if (phone) {
       // Clean phone number (remove spaces, dashes, etc.)
       const cleanPhone = phone.replace(/[^\d]/g, '');
@@ -3450,19 +3630,19 @@ app.get("/users/:id/seller-info", securityMiddleware.sanitizePublicResponse, asy
       } else if (!cleanPhone.startsWith('92')) {
         formattedPhone = '92' + cleanPhone;
       }
-      
+
       // Create call and WhatsApp URLs
       callUrl = `tel:${formattedPhone}`;
       whatsappUrl = `https://wa.me/${formattedPhone}`;
     }
-    
+
     // Build contactInfo object
     const contactInfo = phone ? {
       phone: phone,
       callUrl: callUrl,
       whatsappUrl: whatsappUrl
     } : null;
-    
+
     res.json({
       _id: user._id.toString(),
       name: user.name,
@@ -3490,16 +3670,16 @@ app.post("/track-ad-view/:id", securityMiddleware.sanitizePublicResponse, async 
     if (!id) {
       return res.status(400).json({ success: false, message: "Ad ID required" });
     }
-    
+
     const mongoose = require('mongoose');
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ success: false, message: "Invalid ad ID format" });
     }
-    
+
     // Try to find and update the ad in different collections
     let ad = null;
     let views = 0;
-    
+
     // Try Featured_Ads first
     ad = await Featured_Ads.findById(id);
     if (ad) {
@@ -3508,7 +3688,7 @@ app.post("/track-ad-view/:id", securityMiddleware.sanitizePublicResponse, async 
       views = ad.views;
       return res.json({ success: true, views: views });
     }
-    
+
     // Try Free_Ads
     ad = await Free_Ads.findById(id);
     if (ad) {
@@ -3517,7 +3697,7 @@ app.post("/track-ad-view/:id", securityMiddleware.sanitizePublicResponse, async 
       views = ad.views;
       return res.json({ success: true, views: views });
     }
-    
+
     // Try Bike_Ads
     ad = await Bike_Ads.findById(id);
     if (ad) {
@@ -3526,7 +3706,7 @@ app.post("/track-ad-view/:id", securityMiddleware.sanitizePublicResponse, async 
       views = ad.views;
       return res.json({ success: true, views: views });
     }
-    
+
     // Try NewCarData
     ad = await NewCarData.findById(id);
     if (ad) {
@@ -3535,7 +3715,7 @@ app.post("/track-ad-view/:id", securityMiddleware.sanitizePublicResponse, async 
       views = ad.views;
       return res.json({ success: true, views: views });
     }
-    
+
     // Try ListItforyouad
     ad = await ListItforyouad.findById(id);
     if (ad) {
@@ -3544,7 +3724,7 @@ app.post("/track-ad-view/:id", securityMiddleware.sanitizePublicResponse, async 
       views = ad.views;
       return res.json({ success: true, views: views });
     }
-    
+
     // Try Rent_Car
     ad = await Rent_Car.findById(id);
     if (ad) {
@@ -3553,10 +3733,10 @@ app.post("/track-ad-view/:id", securityMiddleware.sanitizePublicResponse, async 
       views = ad.views;
       return res.json({ success: true, views: views });
     }
-    
+
     // Ad not found in any collection
     return res.status(404).json({ success: false, message: "Ad not found" });
-    
+
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
       console.error('Error tracking ad view:', error);
@@ -3573,22 +3753,22 @@ app.post("/track-ad-view/:id", securityMiddleware.sanitizePublicResponse, async 
 app.post("/toggle_favorite", securityMiddleware.sanitizePublicResponse, async (req, res) => {
   try {
     let { adId, userId } = req.body;
-    
+
     if (!adId || userId == null || userId === '') {
-      return res.status(400).json({ 
-        success: false, 
-        message: "adId and userId are required" 
+      return res.status(400).json({
+        success: false,
+        message: "adId and userId are required"
       });
     }
-    
+
     const mongoose = require('mongoose');
     if (!mongoose.Types.ObjectId.isValid(adId)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid ad ID format" 
+      return res.status(400).json({
+        success: false,
+        message: "Invalid ad ID format"
       });
     }
-    
+
     // Normalize userId: accept string or object (e.g. { _id: "..." }) so favoritedBy always stores a string
     let userIdStr = null;
     if (typeof userId === 'string') {
@@ -3597,15 +3777,15 @@ app.post("/toggle_favorite", securityMiddleware.sanitizePublicResponse, async (r
       userIdStr = (userId._id != null ? String(userId._id) : null) || (userId.userId != null ? String(userId.userId) : null) || (userId.id != null ? String(userId.id) : null);
     }
     if (!userIdStr || !mongoose.Types.ObjectId.isValid(userIdStr)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid user ID format" 
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format"
       });
     }
-    
+
     let ad = null;
     let isFavorited = false;
-    
+
     // Helper function to toggle favorite (always store string in favoritedBy so GET favorite_ads matches)
     const toggleFavoriteInAd = (ad) => {
       if (!ad.favoritedBy) {
@@ -3621,104 +3801,104 @@ app.post("/toggle_favorite", securityMiddleware.sanitizePublicResponse, async (r
         return true;
       }
     };
-    
+
     // Try to find the ad in different collections
     // Try Featured_Ads first
     ad = await Featured_Ads.findById(adId);
     if (ad) {
       isFavorited = toggleFavoriteInAd(ad);
       await ad.save({ timestamps: false }); // FIXED: Don't update updatedAt/dateAdded
-      return res.json({ 
-        success: true, 
+      return res.json({
+        success: true,
         isFavorited: isFavorited,
         message: isFavorited ? "Added to favorites" : "Removed from favorites"
       });
     }
-    
+
     // Try Free_Ads
     ad = await Free_Ads.findById(adId);
     if (ad) {
       isFavorited = toggleFavoriteInAd(ad);
       await ad.save({ timestamps: false }); // FIXED: Don't update updatedAt/dateAdded
-      return res.json({ 
-        success: true, 
+      return res.json({
+        success: true,
         isFavorited: isFavorited,
         message: isFavorited ? "Added to favorites" : "Removed from favorites"
       });
     }
-    
+
     // Try Bike_Ads
     if (Bike_Ads) {
       ad = await Bike_Ads.findById(adId);
       if (ad) {
         isFavorited = toggleFavoriteInAd(ad);
         await ad.save({ timestamps: false }); // FIXED: Don't update updatedAt/dateAdded
-        return res.json({ 
-          success: true, 
+        return res.json({
+          success: true,
           isFavorited: isFavorited,
           message: isFavorited ? "Added to favorites" : "Removed from favorites"
         });
       }
     }
-    
+
     // Try NewCarData
     if (NewCarData) {
       ad = await NewCarData.findById(adId);
       if (ad) {
         isFavorited = toggleFavoriteInAd(ad);
         await ad.save({ timestamps: false }); // FIXED: Don't update updatedAt/dateAdded
-        return res.json({ 
-          success: true, 
+        return res.json({
+          success: true,
           isFavorited: isFavorited,
           message: isFavorited ? "Added to favorites" : "Removed from favorites"
         });
       }
     }
-    
+
     // Try ListItforyouad
     ad = await ListItforyouad.findById(adId);
     if (ad) {
       isFavorited = toggleFavoriteInAd(ad);
       await ad.save({ timestamps: false }); // FIXED: Don't update updatedAt/dateAdded
-      return res.json({ 
-        success: true, 
+      return res.json({
+        success: true,
         isFavorited: isFavorited,
         message: isFavorited ? "Added to favorites" : "Removed from favorites"
       });
     }
-    
+
     // Try Rent_Car
     ad = await Rent_Car.findById(adId);
     if (ad) {
       isFavorited = toggleFavoriteInAd(ad);
       await ad.save({ timestamps: false }); // FIXED: Don't update updatedAt/dateAdded
-      return res.json({ 
-        success: true, 
+      return res.json({
+        success: true,
         isFavorited: isFavorited,
         message: isFavorited ? "Added to favorites" : "Removed from favorites"
       });
     }
-    
+
     // Try AutoStore
     if (AutoStore) {
       ad = await AutoStore.findById(adId);
       if (ad) {
         isFavorited = toggleFavoriteInAd(ad);
         await ad.save({ timestamps: false }); // FIXED: Don't update updatedAt/dateAdded
-        return res.json({ 
-          success: true, 
+        return res.json({
+          success: true,
           isFavorited: isFavorited,
           message: isFavorited ? "Added to favorites" : "Removed from favorites"
         });
       }
     }
-    
+
     // Ad not found in any collection
-    return res.status(404).json({ 
-      success: false, 
-      message: "Ad not found" 
+    return res.status(404).json({
+      success: false,
+      message: "Ad not found"
     });
-    
+
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
       console.error('Error toggling favorite:', error);
@@ -3925,7 +4105,7 @@ app.get("/favorite_ads/:userId", securityMiddleware.sanitizePublicResponse, asyn
 
     const results = [];
     const pushAll = (list) => {
-      if (Array.isArray(list)) list.forEach(ad => { 
+      if (Array.isArray(list)) list.forEach(ad => {
         if (ad && ad._id) {
           // DEBUG: Log first 3 favorites to check dateAdded
           if (results.length < 3) {
@@ -4060,7 +4240,7 @@ app.get("/all_user_ads/:userId", securityMiddleware.sanitizePublicResponse, asyn
     const serializeAd = (ad) => {
       if (!ad) return null;
       const serialized = { ...ad };
-      
+
       // Convert _id to string
       if (serialized._id) {
         if (serialized._id.toString && typeof serialized._id.toString === 'function') {
@@ -4072,7 +4252,7 @@ app.get("/all_user_ads/:userId", securityMiddleware.sanitizePublicResponse, asyn
           return null;
         }
       }
-      
+
       // Convert userId to string
       if (serialized.userId) {
         if (serialized.userId.toString && typeof serialized.userId.toString === 'function') {
@@ -4081,7 +4261,7 @@ app.get("/all_user_ads/:userId", securityMiddleware.sanitizePublicResponse, asyn
           serialized.userId = null; // Set to null if empty object
         }
       }
-      
+
       // Convert addedBy to string (for listItForYou)
       if (serialized.addedBy) {
         if (serialized.addedBy.toString && typeof serialized.addedBy.toString === 'function') {
@@ -4090,7 +4270,7 @@ app.get("/all_user_ads/:userId", securityMiddleware.sanitizePublicResponse, asyn
           serialized.addedBy = null;
         }
       }
-      
+
       // Convert dateAdded to ISO string
       if (serialized.dateAdded) {
         if (serialized.dateAdded instanceof Date) {
@@ -4108,7 +4288,7 @@ app.get("/all_user_ads/:userId", securityMiddleware.sanitizePublicResponse, asyn
           serialized.dateAdded = new Date().toISOString(); // Use current date as fallback
         }
       }
-      
+
       // Convert createdAt to ISO string if exists
       if (serialized.createdAt) {
         if (serialized.createdAt instanceof Date) {
@@ -4124,14 +4304,14 @@ app.get("/all_user_ads/:userId", securityMiddleware.sanitizePublicResponse, asyn
           }
         }
       }
-      
+
       // Convert updatedAt to ISO string if exists
       if (serialized.updatedAt) {
         if (serialized.updatedAt instanceof Date) {
           serialized.updatedAt = serialized.updatedAt.toISOString();
         }
       }
-      
+
       return serialized;
     };
 
@@ -4191,7 +4371,7 @@ const freeAdsStorage = multer.diskStorage({
     cb(null, `free-${unique}.${ext}`);
   }
 });
-const uploadFreeAdsImages = multer({ 
+const uploadFreeAdsImages = multer({
   storage: freeAdsStorage,
   fileFilter: multerImageFilter,
   limits: multerLimits
@@ -4289,7 +4469,7 @@ app.get("/free_ads", authenticateToken, async (req, res) => {
     // Check for query parameters
     const { isPaidAd } = req.query;
     const query = { isDeleted: { $ne: true } };
-    
+
     // Filter by isPaidAd if provided
     if (isPaidAd === 'true') {
       query.isPaidAd = true;
@@ -4303,11 +4483,11 @@ app.get("/free_ads", authenticateToken, async (req, res) => {
       .limit(2000) // Limit to 2000 records for admin panel
       .maxTimeMS(20000) // MongoDB timeout: 20 seconds
       .exec();
-    
+
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('Query timeout')), 20000);
     });
-    
+
     let freeAds = [];
     try {
       freeAds = await Promise.race([queryPromise, timeoutPromise]);
@@ -4315,7 +4495,7 @@ app.get("/free_ads", authenticateToken, async (req, res) => {
       console.error('⚠️ /free_ads query failed:', err.message);
       freeAds = []; // Return empty on error
     }
-    
+
     const queryTime = Date.now() - startTime;
     console.log(`✅ /free_ads: Found ${freeAds.length} ads in ${queryTime}ms`);
     res.json(freeAds);
@@ -4432,10 +4612,10 @@ app.get("/featured_ads/public", securityMiddleware.sanitizePublicResponse, async
   try {
     // Filter only approved, active, non-expired premium cars
     const now = new Date();
-    
+
     // PERFORMANCE: Removed multiple countDocuments calls - they slow down the endpoint
     // Direct query is faster
-    
+
     // Build query conditions - filter at database level
     // FIXED: Admin approval is the primary criteria - show all approved ads
     // isActive and paymentStatus are optional (admin approval takes precedence)
@@ -4453,7 +4633,7 @@ app.get("/featured_ads/public", securityMiddleware.sanitizePublicResponse, async
         }
       ]
     };
-    
+
     // PERFORMANCE: Removed debug logging and optimized query
     // Use select() to fetch only needed fields for faster queries
     const queryPromise = Featured_Ads.find(finalQueryConditions)
@@ -4463,22 +4643,22 @@ app.get("/featured_ads/public", securityMiddleware.sanitizePublicResponse, async
       .limit(100) // PERFORMANCE: Reduced from 500 to 100 for faster response
       .maxTimeMS(8000) // PERFORMANCE: Reduced timeout from 15s to 8s
       .exec();
-    
+
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('Query timeout')), 8000);
     });
-    
+
     let featuredAds = [];
     try {
       featuredAds = await Promise.race([queryPromise, timeoutPromise]);
-      
+
       // PERFORMANCE: Removed fallback queries - they slow down the endpoint
       // If no results, return empty array immediately
     } catch (err) {
       // PERFORMANCE: Removed error logging for faster response
       featuredAds = []; // Return empty on error
     }
-    
+
     // Filter out expired ads based on validityDays + approvedAt (if both exist)
     // Use the same 'now' variable declared above
     const filteredAds = (featuredAds || []).filter((ad) => {
@@ -4499,7 +4679,7 @@ app.get("/featured_ads/public", securityMiddleware.sanitizePublicResponse, async
       }
       return true;
     });
-    
+
     // PERFORMANCE: Optimized ID normalization - faster processing
     const normalizedAds = filteredAds.map((ad) => {
       // Fast _id normalization
@@ -4519,7 +4699,7 @@ app.get("/featured_ads/public", securityMiddleware.sanitizePublicResponse, async
           // Keep original if conversion fails
         }
       }
-      
+
       // Fast userId normalization (critical for own property check)
       if (ad.userId && typeof ad.userId === 'object') {
         try {
@@ -4541,7 +4721,7 @@ app.get("/featured_ads/public", securityMiddleware.sanitizePublicResponse, async
           ad.userId = null;
         }
       }
-      
+
       // Ensure id field exists
       if (!ad.id && ad._id) {
         ad.id = ad._id;
@@ -4552,7 +4732,7 @@ app.get("/featured_ads/public", securityMiddleware.sanitizePublicResponse, async
       if (ad.approvedAt) ad.approvedAt = toISO(ad.approvedAt);
       return ad;
     });
-    
+
     clearTimeout(timeout);
     const queryTime = Date.now() - startTime;
     // PERFORMANCE: Only log if query is slow (>3 seconds)
@@ -4580,11 +4760,11 @@ app.get("/featured_ads", authenticateToken, async (req, res) => {
     }
 
     // Fetch all featured ads
-    const featuredAds = await Featured_Ads.find({ 
-      isDeleted: { $ne: true } 
+    const featuredAds = await Featured_Ads.find({
+      isDeleted: { $ne: true }
     })
-    .sort({ dateAdded: -1 })
-    .lean();
+      .sort({ dateAdded: -1 })
+      .lean();
 
     res.json(featuredAds);
 
@@ -4615,13 +4795,13 @@ app.get("/admin/premium-car-ads", authenticateToken, async (req, res) => {
 
     // Fetch all premium car ads (Featured_Ads are premium car ads)
     // FIXED: Select paymentReceiptImages field to include payment receipt images
-    const premiumCarAds = await Featured_Ads.find({ 
-      isDeleted: { $ne: true } 
+    const premiumCarAds = await Featured_Ads.find({
+      isDeleted: { $ne: true }
     })
-    .select('_id userId title make model variant year price location kmDriven fuelType transmission bodyType bodyColor engineCapacity description features image1 image2 image3 image4 image5 image6 image7 image8 image9 image10 image11 image12 image13 image14 image15 image16 image17 image18 image19 image20 dateAdded isActive isFeatured isDeleted isSold registrationCity assembly preferredContact favoritedBy views paymentStatus featuredExpiryDate validityDays approvedAt invoiceImage paymentReceiptImages paymentAmount packageName packagePrice')
-    .populate('userId', 'name email phone')
-    .sort({ dateAdded: -1 })
-    .lean();
+      .select('_id userId title make model variant year price location kmDriven fuelType transmission bodyType bodyColor engineCapacity description features image1 image2 image3 image4 image5 image6 image7 image8 image9 image10 image11 image12 image13 image14 image15 image16 image17 image18 image19 image20 dateAdded isActive isFeatured isDeleted isSold registrationCity assembly preferredContact favoritedBy views paymentStatus featuredExpiryDate validityDays approvedAt invoiceImage paymentReceiptImages paymentAmount packageName packagePrice')
+      .populate('userId', 'name email phone')
+      .sort({ dateAdded: -1 })
+      .lean();
 
     res.json(premiumCarAds);
 
@@ -4657,12 +4837,12 @@ app.get("/admin/premium-bike-ads", authenticateToken, async (req, res) => {
     }
 
     // Fetch all premium bike ads
-    const premiumBikeAds = await Bike_Ads.find({ 
-      isDeleted: { $ne: true } 
+    const premiumBikeAds = await Bike_Ads.find({
+      isDeleted: { $ne: true }
     })
-    .populate('userId', 'name email phone')
-    .sort({ dateAdded: -1 })
-    .lean();
+      .populate('userId', 'name email phone')
+      .sort({ dateAdded: -1 })
+      .lean();
 
     res.json(premiumBikeAds || []);
 
@@ -4941,16 +5121,16 @@ app.get("/admin/free-bike-ads", authenticateToken, async (req, res) => {
 
     // Fetch all free bike ads (bikes that are not premium/paid)
     // Free bikes are bikes where isPaidAd is not true or doesn't exist
-    const freeBikeAds = await Bike_Ads.find({ 
+    const freeBikeAds = await Bike_Ads.find({
       isDeleted: { $ne: true },
       $or: [
         { isPaidAd: { $ne: true } },
         { isPaidAd: { $exists: false } }
       ]
     })
-    .populate('userId', 'name email phone')
-    .sort({ dateAdded: -1 })
-    .lean();
+      .populate('userId', 'name email phone')
+      .sort({ dateAdded: -1 })
+      .lean();
 
     res.json(freeBikeAds || []);
 
@@ -4983,20 +5163,20 @@ app.get("/list_it_for_you_ad/public", securityMiddleware.sanitizePublicResponse,
 
   try {
     // Use Promise.race for timeout protection
-    const queryPromise = ListItforyouad.find({ 
+    const queryPromise = ListItforyouad.find({
       isDeleted: { $ne: true },
-      isActive: true 
+      isActive: true
     })
       .sort({ dateAdded: -1 })
       .lean()
       .limit(500) // Limit to 500 records
       .maxTimeMS(15000) // MongoDB timeout: 15 seconds
       .exec();
-    
+
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('Query timeout')), 15000);
     });
-    
+
     let ads = [];
     try {
       ads = await Promise.race([queryPromise, timeoutPromise]);
@@ -5004,7 +5184,7 @@ app.get("/list_it_for_you_ad/public", securityMiddleware.sanitizePublicResponse,
       console.error('⚠️ /list_it_for_you_ad/public query failed:', err.message);
       ads = []; // Return empty on error
     }
-    
+
     clearTimeout(timeout);
     const queryTime = Date.now() - startTime;
     console.log(`✅ /list_it_for_you_ad/public: Found ${ads.length} ads in ${queryTime}ms`);
@@ -5069,13 +5249,13 @@ app.get("/all_ads/:id", securityMiddleware.sanitizePublicResponse, async (req, r
         // PERFORMANCE: Use lean() for faster queries on other collections
         doc = await model.findOne({ _id: id, isDeleted: { $ne: true } }).lean();
       }
-      
+
       if (doc) {
         // PERFORMANCE: Removed debug logging for faster response
-        
+
         // FIXED: Serialize IDs to strings
         const serialized = { ...doc, adSource: source };
-        
+
         // Serialize _id
         if (serialized._id && typeof serialized._id === 'object') {
           if (serialized._id.toString && typeof serialized._id.toString === 'function') {
@@ -5084,7 +5264,7 @@ app.get("/all_ads/:id", securityMiddleware.sanitizePublicResponse, async (req, r
             serialized._id = serialized._id._id.toString();
           }
         }
-        
+
         // Serialize userId - FIXED: Properly handle ObjectId (especially for Featured_Ads)
         if (serialized.userId) {
           if (typeof serialized.userId === 'string') {
@@ -5098,10 +5278,10 @@ app.get("/all_ads/:id", securityMiddleware.sanitizePublicResponse, async (req, r
             }
           } else if (typeof serialized.userId === 'object' && serialized.userId !== null) {
             // Check if it's a valid ObjectId instance
-            const isObjectId = serialized.userId.constructor && 
-                              (serialized.userId.constructor.name === 'ObjectId' || 
-                               serialized.userId.constructor.name === 'Types.ObjectId');
-            
+            const isObjectId = serialized.userId.constructor &&
+              (serialized.userId.constructor.name === 'ObjectId' ||
+                serialized.userId.constructor.name === 'Types.ObjectId');
+
             if (isObjectId || (serialized.userId.toString && typeof serialized.userId.toString === 'function')) {
               // Valid ObjectId instance - convert to string
               try {
@@ -5153,9 +5333,9 @@ app.get("/all_ads/:id", securityMiddleware.sanitizePublicResponse, async (req, r
           // userId is missing - silently set to null (no logging for performance)
           serialized.userId = null;
         }
-        
+
         // PERFORMANCE: Removed debug logging for faster response
-        
+
         // Serialize addedBy (for listItForYou)
         if (serialized.addedBy && typeof serialized.addedBy === 'object') {
           if (serialized.addedBy.toString && typeof serialized.addedBy.toString === 'function') {
@@ -5166,7 +5346,7 @@ app.get("/all_ads/:id", securityMiddleware.sanitizePublicResponse, async (req, r
             serialized.addedBy = null;
           }
         }
-        
+
         // Always serialize dateAdded and approvedAt to ISO so app shows "X days ago" (post date)
         const toISO = (val) => {
           if (!val) return null;
@@ -5176,11 +5356,11 @@ app.get("/all_ads/:id", securityMiddleware.sanitizePublicResponse, async (req, r
         };
         serialized.dateAdded = toISO(serialized.dateAdded) || toISO(serialized.approvedAt) || toISO(serialized.createdAt) || new Date().toISOString();
         serialized.approvedAt = toISO(serialized.approvedAt) || serialized.dateAdded;
-        
+
         return res.json(serialized);
       }
     }
-    
+
     // No ad found in any collection
     return res.status(404).json({ success: false, message: "Ad not found" });
   } catch (error) {
@@ -5215,9 +5395,9 @@ app.get("/all_ads", securityMiddleware.sanitizePublicResponse, async (req, res) 
     const baseQuery = { isDeleted: { $ne: true } };
     const collections = [
       { model: Free_Ads, source: 'free_ads', query: baseQuery },
-      { 
-        model: Featured_Ads, 
-        source: 'featured_ads', 
+      {
+        model: Featured_Ads,
+        source: 'featured_ads',
         // Fetch all non-deleted premium cars, filter active/approved in JavaScript
         query: baseQuery
       },
@@ -5226,7 +5406,7 @@ app.get("/all_ads", securityMiddleware.sanitizePublicResponse, async (req, res) 
       { model: ListItforyouad, source: 'list_it_for_you_ad', query: baseQuery },
       { model: Rent_Car, source: 'rent_car', query: baseQuery }
     ].filter(c => c.model);
-    
+
     // Use Promise.race for timeout protection
     const now = new Date();
     const queryPromise = Promise.all(
@@ -5254,7 +5434,7 @@ app.get("/all_ads", securityMiddleware.sanitizePublicResponse, async (req, res) 
             // No isActive filter - managed cars always show
           };
         }
-        
+
         // PERFORMANCE: Optimized query - select only essential fields
         // FIXED: Increased limit for premium cars to ensure all approved cars are fetched
         const limitForSource = source === 'featured_ads' ? 200 : 100; // More premium cars allowed
@@ -5264,7 +5444,7 @@ app.get("/all_ads", securityMiddleware.sanitizePublicResponse, async (req, res) 
           .lean()
           .limit(limitForSource)
           .maxTimeMS(8000); // PERFORMANCE: Reduced timeout from 10s to 8s
-        
+
         // Filter premium cars: check validityDays + approvedAt expiry
         // FIXED: Don't filter out premium cars unnecessarily - backend query already handles expiry
         const filtered = list.filter((doc) => {
@@ -5287,14 +5467,14 @@ app.get("/all_ads", securityMiddleware.sanitizePublicResponse, async (req, res) 
             }
             // If no validityDays, keep the ad (backend query already filtered by featuredExpiryDate)
           }
-          
+
           // For other ad types, return as-is
           return true;
         });
-        
+
         return filtered.map(doc => {
           const enriched = { ...doc, adSource: source };
-          
+
           // FIXED: Serialize _id to string
           if (enriched._id) {
             if (enriched._id.toString && typeof enriched._id.toString === 'function') {
@@ -5306,7 +5486,7 @@ app.get("/all_ads", securityMiddleware.sanitizePublicResponse, async (req, res) 
               return null;
             }
           }
-          
+
           // FIXED: Serialize userId to string
           if (enriched.userId) {
             if (enriched.userId.toString && typeof enriched.userId.toString === 'function') {
@@ -5317,7 +5497,7 @@ app.get("/all_ads", securityMiddleware.sanitizePublicResponse, async (req, res) 
               enriched.userId = null; // Set to null if empty object
             }
           }
-          
+
           // FIXED: Serialize addedBy to string (for listItForYou)
           if (enriched.addedBy) {
             if (enriched.addedBy.toString && typeof enriched.addedBy.toString === 'function') {
@@ -5328,7 +5508,7 @@ app.get("/all_ads", securityMiddleware.sanitizePublicResponse, async (req, res) 
               enriched.addedBy = null;
             }
           }
-          
+
           // FIXED: Serialize date fields to ISO strings for proper frontend parsing
           if (enriched.dateAdded) {
             if (enriched.dateAdded instanceof Date) {
@@ -5365,7 +5545,7 @@ app.get("/all_ads", securityMiddleware.sanitizePublicResponse, async (req, res) 
               }
             }
           }
-          
+
           // Set modelType based on source for frontend compatibility
           if (source === 'featured_ads') {
             enriched.modelType = 'Featured';
@@ -5384,12 +5564,12 @@ app.get("/all_ads", securityMiddleware.sanitizePublicResponse, async (req, res) 
         }).filter(doc => doc !== null); // Remove null entries
       })
     );
-    
+
     // PERFORMANCE: Reduced timeout from 20s to 12s for faster failure
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('Query timeout')), 12000);
     });
-    
+
     let results = [];
     try {
       results = await Promise.race([queryPromise, timeoutPromise]);
@@ -5397,7 +5577,7 @@ app.get("/all_ads", securityMiddleware.sanitizePublicResponse, async (req, res) 
       // PERFORMANCE: Removed error logging for faster response
       results = []; // Return empty on error
     }
-    
+
     clearTimeout(timeout);
     // FIXED: Final serialization pass to ensure all IDs are strings and dates are ISO strings
     const all = results.flat()
@@ -5474,28 +5654,28 @@ app.get("/all_ads", securityMiddleware.sanitizePublicResponse, async (req, res) 
         return dateB - dateA; // Newest first
       });
     const queryTime = Date.now() - startTime;
-    
+
     // PERFORMANCE: Removed unnecessary filtering and logging for faster response
     // Only log if query took too long (>5 seconds)
     if (queryTime > 5000) {
       console.warn(`⚠️ /all_ads query took ${queryTime}ms (slow)`);
     }
-    
+
     // FIXED: Count premium cars from results for logging
-    const premiumCars = all.filter((ad) => 
+    const premiumCars = all.filter((ad) =>
       ad.modelType === 'Featured' || ad.adSource === 'featured_ads'
     );
-    const managedCars = all.filter((ad) => 
+    const managedCars = all.filter((ad) =>
       ad.modelType === 'ListItForYou' || ad.isManaged
     );
-    const freeCars = all.filter((ad) => 
+    const freeCars = all.filter((ad) =>
       ad.modelType === 'Free' && !ad.isManaged && ad.modelType !== 'ListItForYou'
     );
     const activePremium = premiumCars.filter((ad) => ad.isActive === true).length;
-    const approvedPremium = premiumCars.filter((ad) => 
+    const approvedPremium = premiumCars.filter((ad) =>
       ad.isFeatured === 'Approved' || ad.isFeatured === true || ad.paymentStatus === 'verified'
     ).length;
-    
+
     if (process.env.NODE_ENV !== 'production') {
       console.log(`✅ /all_ads: Found ${all.length} total ads in ${queryTime}ms`);
       console.log(`📊 Breakdown: ${managedCars.length} Managed, ${premiumCars.length} Premium (${approvedPremium} approved), ${freeCars.length} Free`);
@@ -5512,7 +5692,7 @@ app.get("/all_ads", securityMiddleware.sanitizePublicResponse, async (req, res) 
         })));
       }
     }
-    
+
     res.json(all);
   } catch (error) {
     clearTimeout(timeout);
@@ -5535,11 +5715,11 @@ app.get("/list_it_for_you_ad", authenticateToken, async (req, res) => {
     }
 
     // Fetch all list it for you ads
-    const listItForYouAds = await ListItforyouad.find({ 
-      isDeleted: { $ne: true } 
+    const listItForYouAds = await ListItforyouad.find({
+      isDeleted: { $ne: true }
     })
-    .sort({ dateAdded: -1 })
-    .lean();
+      .sort({ dateAdded: -1 })
+      .lean();
 
     res.json(listItForYouAds);
 
@@ -5569,7 +5749,7 @@ const listItForYouStorage = multer.diskStorage({
     cb(null, `${field}-${unique}.${ext}`);
   }
 });
-const uploadListItForYou = multer({ 
+const uploadListItForYou = multer({
   storage: listItForYouStorage,
   fileFilter: multerImageFilter,
   limits: multerLimits
@@ -5661,7 +5841,7 @@ app.get("/new_cars/public", securityMiddleware.sanitizePublicResponse, async (re
   }, 20000);
 
   try {
-    
+
     // Use Promise.race for timeout protection
     const queryPromise = NewCarData.find({ isDeleted: { $ne: true } })
       .sort({ dateAdded: -1 })
@@ -5669,11 +5849,11 @@ app.get("/new_cars/public", securityMiddleware.sanitizePublicResponse, async (re
       .limit(500) // Limit to 500 records
       .maxTimeMS(15000) // MongoDB timeout: 15 seconds
       .exec();
-    
+
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('Query timeout')), 15000);
     });
-    
+
     let newCars = [];
     try {
       newCars = await Promise.race([queryPromise, timeoutPromise]);
@@ -5681,7 +5861,7 @@ app.get("/new_cars/public", securityMiddleware.sanitizePublicResponse, async (re
       console.error('⚠️ /new_cars/public query failed:', err.message);
       newCars = []; // Return empty on error
     }
-    
+
     clearTimeout(timeout);
     const queryTime = Date.now() - startTime;
     console.log(`✅ /new_cars/public: Found ${newCars.length} cars in ${queryTime}ms`);
@@ -5705,8 +5885,8 @@ app.get("/new_cars", authenticateToken, async (req, res) => {
     }
 
     // Fetch all new cars
-    const newCars = await NewCarData.find({ 
-      isDeleted: { $ne: true } 
+    const newCars = await NewCarData.find({
+      isDeleted: { $ne: true }
     })
       .sort({ dateAdded: -1 })
       .lean();
@@ -5729,7 +5909,7 @@ app.post("/new_cars", authenticateToken, async (req, res) => {
   try {
     console.log('📝 POST /new_cars called by admin');
     console.log('📦 Request body:', JSON.stringify(req.body).substring(0, 200));
-    
+
     // Check if user is Admin or SuperAdmin
     const userType = String(req.userType || '').toLowerCase();
     if (userType !== 'admin' && userType !== 'superadmin') {
@@ -5752,10 +5932,10 @@ app.post("/new_cars", authenticateToken, async (req, res) => {
     await newCarData.save();
     console.log('✅ New car created successfully:', newCarData._id);
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: "New car created successfully",
-      data: newCarData 
+      data: newCarData
     });
 
   } catch (error) {
@@ -5774,7 +5954,7 @@ app.patch("/new_cars/:id/status", authenticateToken, async (req, res) => {
     console.log('🔄 PATCH /new_cars/:id/status called');
     console.log('📝 Car ID:', req.params.id);
     console.log('📦 Status update:', req.body);
-    
+
     // Check if user is Admin or SuperAdmin
     const userType = String(req.userType || '').toLowerCase();
     if (userType !== 'admin' && userType !== 'superadmin') {
@@ -5835,7 +6015,7 @@ app.patch("/new_cars/:id", authenticateToken, async (req, res) => {
     console.log('✏️ PATCH /new_cars/:id called (edit)');
     console.log('📝 Car ID:', req.params.id);
     console.log('📦 Update data:', JSON.stringify(req.body).substring(0, 200));
-    
+
     // Check if user is Admin or SuperAdmin
     const userType = String(req.userType || '').toLowerCase();
     if (userType !== 'admin' && userType !== 'superadmin') {
@@ -5847,7 +6027,7 @@ app.patch("/new_cars/:id", authenticateToken, async (req, res) => {
     }
 
     const { id } = req.params;
-    
+
     if (!id) {
       return res.status(400).json({ success: false, message: "Car ID required" });
     }
@@ -5886,7 +6066,7 @@ app.delete("/new_cars/:id", authenticateToken, async (req, res) => {
   try {
     console.log('🗑️ DELETE /new_cars/:id called');
     console.log('📝 Car ID:', req.params.id);
-    
+
     // Check if user is Admin or SuperAdmin
     const userType = String(req.userType || '').toLowerCase();
     if (userType !== 'admin' && userType !== 'superadmin') {
@@ -5898,7 +6078,7 @@ app.delete("/new_cars/:id", authenticateToken, async (req, res) => {
     }
 
     const { id } = req.params;
-    
+
     if (!id) {
       return res.status(400).json({ success: false, message: "Car ID required" });
     }
@@ -5945,7 +6125,7 @@ const bikeAdsStorage = multer.diskStorage({
     cb(null, `bike-${unique}.${ext}`);
   }
 });
-const uploadBikeAdsImages = multer({ 
+const uploadBikeAdsImages = multer({
   storage: bikeAdsStorage,
   fileFilter: multerImageFilter,
   limits: multerLimits
@@ -6044,7 +6224,7 @@ app.get("/bike_ads/public", securityMiddleware.sanitizePublicResponse, async (re
   }, 20000);
 
   try {
-    
+
     // Only show Approved premium bikes or free bikes (no Pending/Rejected in Used Bikes list)
     const queryPromise = Bike_Ads.find({
       isDeleted: { $ne: true },
@@ -6055,11 +6235,11 @@ app.get("/bike_ads/public", securityMiddleware.sanitizePublicResponse, async (re
       .limit(500) // Limit to 500 records
       .maxTimeMS(15000) // MongoDB timeout: 15 seconds
       .exec();
-    
+
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('Query timeout')), 15000);
     });
-    
+
     let bikeAds = [];
     try {
       bikeAds = await Promise.race([queryPromise, timeoutPromise]);
@@ -6067,7 +6247,7 @@ app.get("/bike_ads/public", securityMiddleware.sanitizePublicResponse, async (re
       console.error('⚠️ /bike_ads/public query failed:', err.message);
       bikeAds = []; // Return empty on error
     }
-    
+
     // Serialize dateAdded to ISO so app shows "X days ago" (same as used cars)
     const toISO = (v) => { if (!v) return null; try { return (v instanceof Date) ? v.toISOString() : new Date(v).toISOString(); } catch (e) { return null; } };
     const withDates = (bikeAds || []).map((ad) => {
@@ -6105,11 +6285,11 @@ app.get("/bike_ads", authenticateToken, async (req, res) => {
     }
 
     // Fetch all bike ads
-    const bikeAds = await Bike_Ads.find({ 
-      isDeleted: { $ne: true } 
+    const bikeAds = await Bike_Ads.find({
+      isDeleted: { $ne: true }
     })
-    .sort({ dateAdded: -1 })
-    .lean();
+      .sort({ dateAdded: -1 })
+      .lean();
 
     res.json(bikeAds || []);
 
@@ -6163,7 +6343,7 @@ app.post("/rent_car", uploadRentCarImages, multerErrorHandler, async (req, res) 
     let availabilityDates = [];
     try {
       if (b.availabilityDates) availabilityDates = JSON.parse(b.availabilityDates);
-    } catch (_) {}
+    } catch (_) { }
     const doc = {
       userId: new mongoose.Types.ObjectId(userId),
       title: title || `${make} ${model}`,
@@ -6248,11 +6428,11 @@ app.get("/rent_car", authenticateToken, async (req, res) => {
     }
 
     // Fetch all rent car ads
-    const rentCars = await Rent_Car.find({ 
-      isDeleted: { $ne: true } 
+    const rentCars = await Rent_Car.find({
+      isDeleted: { $ne: true }
     })
-    .sort({ dateAdded: -1 })
-    .lean();
+      .sort({ dateAdded: -1 })
+      .lean();
 
     res.json(rentCars);
 
@@ -6284,7 +6464,7 @@ const autoPartsStorage = multer.diskStorage({
     cb(null, `part-${unique}.${ext}`);
   }
 });
-const uploadAutoPartsImages = multer({ 
+const uploadAutoPartsImages = multer({
   storage: autoPartsStorage,
   fileFilter: multerImageFilter,
   limits: multerLimits
@@ -6333,7 +6513,7 @@ app.get("/autoparts/public", securityMiddleware.sanitizePublicResponse, async (r
     const parts = await AutoStore.find({ isDeleted: { $ne: true } })
       .sort({ dateAdded: -1 })
       .lean();
-    
+
     // Ensure _id is converted to string for all parts
     const normalizedParts = (parts || []).map((part) => {
       if (part._id) {
@@ -6366,7 +6546,7 @@ app.get("/autoparts/public", securityMiddleware.sanitizePublicResponse, async (r
       }
       return part;
     });
-    
+
     res.json(normalizedParts || []);
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') console.error('Error fetching auto parts (public):', error);
@@ -6404,11 +6584,11 @@ app.get("/autoparts", authenticateToken, async (req, res) => {
     }
 
     // Fetch all auto parts
-    const autoParts = await AutoStore.find({ 
-      isDeleted: { $ne: true } 
+    const autoParts = await AutoStore.find({
+      isDeleted: { $ne: true }
     })
-    .sort({ dateAdded: -1 })
-    .lean();
+      .sort({ dateAdded: -1 })
+      .lean();
 
     res.json(autoParts || []);
 
@@ -6442,9 +6622,9 @@ const inspectionReceiptStorage = multer.diskStorage({
     cb(null, `receipt-${unique}.${ext}`);
   }
 });
-const uploadInspectionReceipts = multer({ 
-  storage: inspectionReceiptStorage, 
-  fileFilter: multerImageFilter, 
+const uploadInspectionReceipts = multer({
+  storage: inspectionReceiptStorage,
+  fileFilter: multerImageFilter,
   limits: { ...multerLimits, files: 10 } // Allow up to 10 receipt images
 }).array('payment_receipt', 10);
 
@@ -6453,16 +6633,16 @@ app.post("/inspection", uploadInspectionReceipts, multerErrorHandler, async (req
   try {
     const b = req.body || {};
     const userId = b.userId;
-    
+
     if (!userId) {
       return res.status(400).json({ success: false, message: "userId is required." });
     }
-    
+
     const mongoose = require('mongoose');
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ success: false, message: "Invalid userId." });
     }
-    
+
     // Extract form data
     const location = (b.location || '').trim();
     const make = (b.make || '').trim();
@@ -6475,15 +6655,15 @@ app.post("/inspection", uploadInspectionReceipts, multerErrorHandler, async (req
     const inspection_date = b.inspection_date || '';
     const inspection_time = (b.inspection_time || '').trim();
     const adId = b.adId || null;
-    
+
     // Validate required fields
     if (!location || !make || !model || !year) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "location, make, model, and year are required." 
+      return res.status(400).json({
+        success: false,
+        message: "location, make, model, and year are required."
       });
     }
-    
+
     // Process payment receipt images
     const paymentReceiptImages = [];
     if (req.files && Array.isArray(req.files) && req.files.length > 0) {
@@ -6493,7 +6673,7 @@ app.post("/inspection", uploadInspectionReceipts, multerErrorHandler, async (req
         }
       });
     }
-    
+
     // Create inspection document
     const doc = {
       userId: new mongoose.Types.ObjectId(userId),
@@ -6512,26 +6692,26 @@ app.post("/inspection", uploadInspectionReceipts, multerErrorHandler, async (req
       status: "Pending",
       isDeleted: false
     };
-    
+
     // Add adId if provided
     if (adId && mongoose.Types.ObjectId.isValid(adId)) {
       doc.adId = new mongoose.Types.ObjectId(adId);
     }
-    
+
     const inspection = new Inspection(doc);
     await inspection.save();
-    
-    return res.status(201).json({ 
-      success: true, 
-      message: "Inspection request submitted successfully.", 
-      data: { id: inspection._id.toString() } 
+
+    return res.status(201).json({
+      success: true,
+      message: "Inspection request submitted successfully.",
+      data: { id: inspection._id.toString() }
     });
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
       console.error('Create inspection error:', error);
     }
-    return res.status(500).json({ 
-      success: false, 
+    return res.status(500).json({
+      success: false,
       message: "Failed to submit inspection request.",
       error: process.env.NODE_ENV !== 'production' ? error.message : undefined
     });
@@ -6546,19 +6726,19 @@ app.get("/api/admin/inspection/requests", authenticateToken, async (req, res) =>
     if (userType !== 'admin' && userType !== 'superadmin') {
       return res.status(403).json({ success: false, message: "Access denied. Admin access required." });
     }
-    
+
     const { status = 'pending' } = req.query;
     const query = {};
     if (status && status !== 'all') {
       query.status = status;
     }
-    
+
     const requests = await InspectionJob.find(query)
       .populate('sellerId', 'name email phone')
       .populate('requestedByUserId', 'name email phone')
       .sort({ createdAt: -1 })
       .lean();
-    
+
     return res.json({ success: true, requests });
   } catch (e) {
     console.error('List inspection requests error:', e);
@@ -6573,25 +6753,25 @@ app.post("/api/admin/inspection/assign", authenticateToken, async (req, res) => 
     if (userType !== 'admin' && userType !== 'superadmin') {
       return res.status(403).json({ success: false, message: "Access denied. Admin access required." });
     }
-    
+
     const { requestId, inspectorId, scheduledAt } = req.body;
     if (!requestId || !inspectorId || !scheduledAt) {
       return res.status(400).json({ success: false, message: 'requestId, inspectorId, and scheduledAt are required' });
     }
-    
+
     const job = await InspectionJob.findById(requestId);
     if (!job) {
       return res.status(404).json({ success: false, message: 'Inspection request not found' });
     }
-    
+
     job.inspectorId = inspectorId;
     job.assignedByAdminId = req.userId;
     job.assignedAt = new Date();
     job.status = 'assigned';
     job.requestedAt = scheduledAt ? new Date(scheduledAt) : new Date();
-    
+
     await job.save();
-    
+
     return res.json({ success: true, inspectionId: job._id.toString() });
   } catch (e) {
     console.error('Assign inspection error:', e);
@@ -6606,22 +6786,22 @@ app.post("/api/admin/inspection/:inspectionId/approve", authenticateToken, async
     if (userType !== 'admin' && userType !== 'superadmin') {
       return res.status(403).json({ success: false, message: "Access denied. Admin access required." });
     }
-    
+
     const { inspectionId } = req.params;
     const job = await InspectionJob.findById(inspectionId);
     if (!job) {
       return res.status(404).json({ success: false, message: 'Inspection not found' });
     }
-    
+
     job.status = 'Approved';
     await job.save();
-    
+
     // Return the full inspection report
     const report = await InspectionJob.findById(inspectionId)
       .populate('inspectorId', 'name email phone')
       .populate('sellerId', 'name email phone')
       .lean();
-    
+
     return res.json({ success: true, ...report });
   } catch (e) {
     console.error('Approve inspection error:', e);
@@ -6633,20 +6813,20 @@ app.post("/api/admin/inspection/:inspectionId/approve", authenticateToken, async
 app.get("/api/inspection/verify/:verificationCode", async (req, res) => {
   try {
     const { verificationCode } = req.params;
-    
+
     // Search for inspection by verification_code field or by _id
     const mongoose = require('mongoose');
     let job;
-    
+
     // Try to find by verification_code field first
-    job = await InspectionJob.findOne({ 
+    job = await InspectionJob.findOne({
       verification_code: verificationCode,
       status: { $in: ['Approved', 'approved'] }
     })
       .populate('inspectorId', 'name email phone')
       .populate('sellerId', 'name email phone')
       .lean();
-    
+
     // If not found by verification_code, try by _id
     if (!job && mongoose.Types.ObjectId.isValid(verificationCode)) {
       job = await InspectionJob.findOne({
@@ -6657,11 +6837,11 @@ app.get("/api/inspection/verify/:verificationCode", async (req, res) => {
         .populate('sellerId', 'name email phone')
         .lean();
     }
-    
+
     if (!job) {
       return res.status(404).json({ success: false, message: 'Inspection not found or not approved' });
     }
-    
+
     return res.json({ success: true, ...job });
   } catch (e) {
     console.error('Verify inspection error:', e);
@@ -6683,11 +6863,11 @@ app.get("/inspection", authenticateToken, async (req, res) => {
     }
 
     // Fetch all inspections
-    const inspections = await Inspection.find({ 
-      isDeleted: { $ne: true } 
+    const inspections = await Inspection.find({
+      isDeleted: { $ne: true }
     })
-    .sort({ createdAt: -1 })
-    .lean();
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.json(inspections);
 
@@ -6720,8 +6900,8 @@ app.get("/admin/inspections/:status", authenticateToken, async (req, res) => {
     const { search } = req.query;
 
     // Build query
-    const query = { 
-      isDeleted: { $ne: true } 
+    const query = {
+      isDeleted: { $ne: true }
     };
 
     // Filter by status (case-insensitive)
@@ -6838,21 +7018,21 @@ app.put("/inspections/:id/status", authenticateToken, async (req, res) => {
 app.get("/admin-contact", contactRateLimiter, authenticateToken, async (req, res) => {
   try {
     const { adId } = req.query;
-    
+
     // Find admin user
     const admin = await User.findOne({ userType: 'Admin' }).select('phone name');
-    
+
     if (!admin) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Admin not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'Admin not found'
       });
     }
-    
+
     if (process.env.NODE_ENV !== 'production') {
       console.log('Admin contact fetched:', admin.phone);
     }
-    
+
     res.json({
       success: true,
       phone: admin.phone,
@@ -6862,9 +7042,9 @@ app.get("/admin-contact", contactRateLimiter, authenticateToken, async (req, res
     if (process.env.NODE_ENV !== 'production') {
       console.error('Error fetching admin contact:', error);
     }
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error fetching admin contact' 
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching admin contact'
     });
   }
 });
@@ -6879,14 +7059,14 @@ app.get("/dashboard/stats", authenticateToken, async (req, res) => {
     console.log("🔐 req.userType type:", typeof req.userType);
     console.log("🔐 req.userId:", req.userId);
     console.log("🔐 ==============================================");
-    
+
     // Check if user is Admin or SuperAdmin (case-insensitive)
     const userType = String(req.userType || '').toLowerCase().trim();
     const isAuthorized = userType === 'admin' || userType === 'superadmin';
-    
+
     console.log("🔐 Normalized userType:", userType);
     console.log("🔐 Is Authorized?", isAuthorized);
-    
+
     if (!isAuthorized) {
       console.error("❌ Access denied - UserType:", req.userType, "| Normalized:", userType, "| Expected: admin or superadmin");
       return res.status(403).json({
@@ -6900,7 +7080,7 @@ app.get("/dashboard/stats", authenticateToken, async (req, res) => {
         }
       });
     }
-    
+
     console.log("✅ Access granted - Admin/SuperAdmin verified");
 
     // Calculate date ranges for growth comparison (last 30 days vs previous 30 days)
@@ -6951,47 +7131,47 @@ app.get("/dashboard/stats", authenticateToken, async (req, res) => {
       // Users
       User.countDocuments({ isDeleted: { $ne: true } }),
       User.countDocuments({ isDeleted: { $ne: true }, dateAdded: { $lt: thirtyDaysAgo } }),
-      
+
       // Staff
       User.countDocuments({ userType: { $in: ['Admin', 'SuperAdmin'] }, isDeleted: { $ne: true } }),
       Inspector.countDocuments({ isDeleted: { $ne: true }, isActive: true }),
-      
+
       // Free Ads
       Free_Ads.countDocuments({ isDeleted: { $ne: true } }),
       Free_Ads.countDocuments({ isDeleted: { $ne: true }, dateAdded: { $lt: thirtyDaysAgo } }),
-      
+
       // Featured Ads - Pending
       Featured_Ads.countDocuments({ isDeleted: { $ne: true }, isFeatured: 'Pending' }),
       Featured_Ads.countDocuments({ isDeleted: { $ne: true }, isFeatured: 'Pending', dateAdded: { $lt: thirtyDaysAgo } }),
-      
+
       // Featured Ads - Approved
       Featured_Ads.countDocuments({ isDeleted: { $ne: true }, isFeatured: 'Approved' }),
       Featured_Ads.countDocuments({ isDeleted: { $ne: true }, isFeatured: 'Approved', dateAdded: { $lt: thirtyDaysAgo } }),
-      
+
       // List It For You - Pending (uses adStatus field, lowercase)
       ListItforyouad.countDocuments({ isDeleted: { $ne: true }, adStatus: 'pending' }),
       ListItforyouad.countDocuments({ isDeleted: { $ne: true }, adStatus: 'pending', dateAdded: { $lt: thirtyDaysAgo } }),
-      
+
       // List It For You - Approved (uses adStatus field, lowercase)
       ListItforyouad.countDocuments({ isDeleted: { $ne: true }, adStatus: 'approved' }),
       ListItforyouad.countDocuments({ isDeleted: { $ne: true }, adStatus: 'approved', dateAdded: { $lt: thirtyDaysAgo } }),
-      
+
       // Buy Car For Me - Pending (check if status field exists, otherwise use isActive: false)
       BuyCar.countDocuments({ isDeleted: { $ne: true }, isActive: false }),
       BuyCar.countDocuments({ isDeleted: { $ne: true }, isActive: false, dateAdded: { $lt: thirtyDaysAgo } }),
-      
+
       // Buy Car For Me - Approved (check if status field exists, otherwise use isActive: true)
       BuyCar.countDocuments({ isDeleted: { $ne: true }, isActive: true }),
       BuyCar.countDocuments({ isDeleted: { $ne: true }, isActive: true, dateAdded: { $lt: thirtyDaysAgo } }),
-      
+
       // Inspections - Pending (uses status field)
       Inspection.countDocuments({ isDeleted: { $ne: true }, status: 'Pending' }),
       Inspection.countDocuments({ isDeleted: { $ne: true }, status: 'Pending', dateAdded: { $lt: thirtyDaysAgo } }),
-      
+
       // Inspections - Approved/Completed (uses status field)
       Inspection.countDocuments({ isDeleted: { $ne: true }, status: { $in: ['Completed', 'Scheduled'] } }),
       Inspection.countDocuments({ isDeleted: { $ne: true }, status: { $in: ['Completed', 'Scheduled'] }, dateAdded: { $lt: thirtyDaysAgo } }),
-      
+
       // Rental Ads
       Rent_Car.countDocuments({ isDeleted: { $ne: true } }),
       Rent_Car.countDocuments({ isDeleted: { $ne: true }, dateAdded: { $lt: thirtyDaysAgo } })
@@ -7115,14 +7295,14 @@ app.get("/inspector/inspections/:inspectorId", async (req, res) => {
   const startTime = Date.now();
   try {
     const { inspectorId } = req.params;
-    
+
     console.log('🔍 Fetching inspections for inspector:', inspectorId);
-    
+
     // Build query - match inspectorId (ObjectId) OR InspectorId (string) - Inspection model stores both
     const mongoose = require('mongoose');
-    const is_valid_oid = mongoose.Types.ObjectId.isValid(inspectorId) && 
+    const is_valid_oid = mongoose.Types.ObjectId.isValid(inspectorId) &&
       (new mongoose.Types.ObjectId(inspectorId)).toString() === inspectorId;
-    
+
     const query = { isDeleted: { $ne: true } };
     if (is_valid_oid) {
       query.$or = [
@@ -7132,9 +7312,9 @@ app.get("/inspector/inspections/:inspectorId", async (req, res) => {
     } else {
       query.InspectorId = inspectorId;
     }
-    
+
     console.log('🔍 Query:', JSON.stringify(query));
-    
+
     // Find inspections assigned to this inspector from Inspection model (admin assigns via this model)
     // Optimize: Use lean() and selective populate for better performance
     const queryStartTime = Date.now();
@@ -7148,31 +7328,31 @@ app.get("/inspector/inspections/:inspectorId", async (req, res) => {
       .sort({ dateAdded: -1 })
       .lean()
       .limit(1000); // Limit to prevent huge responses
-    
+
     const queryTime = Date.now() - queryStartTime;
     console.log(`⏱️ Database query took ${queryTime}ms, found ${inspections.length} inspections`);
-    
+
     // Group by status - Inspection uses: Pending, Rejected, Scheduled, Completed
-    const completedInspections = inspections.filter(inv => 
+    const completedInspections = inspections.filter(inv =>
       (inv.status || '').toLowerCase() === 'completed' || (inv.status || '').toLowerCase() === 'approved'
     );
-    
-    const failedInspections = inspections.filter(inv => 
+
+    const failedInspections = inspections.filter(inv =>
       (inv.status || '').toLowerCase() === 'rejected' || (inv.status || '').toLowerCase() === 'cancelled'
     );
-    
+
     const pendingInspections = inspections.filter(inv => {
       const s = (inv.status || '').toLowerCase();
       return s === 'pending' || s === 'scheduled';
     });
-    
+
     const totalTime = Date.now() - startTime;
     console.log('✅ Found inspections:', inspections.length);
     console.log('✅ Pending/Scheduled:', pendingInspections.length);
     console.log('✅ Completed:', completedInspections.length);
     console.log('✅ Failed:', failedInspections.length);
     console.log(`⏱️ Total request time: ${totalTime}ms`);
-    
+
     res.json({
       success: true,
       inspections: pendingInspections,
@@ -7261,12 +7441,12 @@ app.get("/buy_car_requests", authenticateToken, async (req, res) => {
     }
 
     // Fetch all buy car requests
-    const buyCarRequests = await BuyCar.find({ 
-      isDeleted: { $ne: true } 
+    const buyCarRequests = await BuyCar.find({
+      isDeleted: { $ne: true }
     })
-    .populate('userId', 'name email phone')
-    .sort({ dateAdded: -1 })
-    .lean();
+      .populate('userId', 'name email phone')
+      .sort({ dateAdded: -1 })
+      .lean();
 
     res.json(buyCarRequests);
 
@@ -7301,7 +7481,7 @@ app.patch("/buy_car_requests/:id/status", authenticateToken, async (req, res) =>
     // Update the buy car request
     const updatedRequest = await BuyCar.findByIdAndUpdate(
       id,
-      { 
+      {
         isActive: status === 'Completed' || status === 'InProgress' ? true : false,
         status: status,
         adminComments: comments || '',
@@ -7309,8 +7489,8 @@ app.patch("/buy_car_requests/:id/status", authenticateToken, async (req, res) =>
       },
       { new: true }
     )
-    .populate('userId', 'name email phone')
-    .lean();
+      .populate('userId', 'name email phone')
+      .lean();
 
     if (!updatedRequest) {
       return res.status(404).json({
@@ -7354,7 +7534,7 @@ app.delete("/buy_car_requests/:id", authenticateToken, async (req, res) => {
     // Soft delete the buy car request
     const deletedRequest = await BuyCar.findByIdAndUpdate(
       id,
-      { 
+      {
         isDeleted: true,
         updatedAt: new Date()
       },
@@ -7407,7 +7587,7 @@ app.get("/dealer_packages", authenticateToken, async (req, res) => {
     const { type } = req.query;
 
     // Build query
-    const query = { 
+    const query = {
       isDeleted: { $ne: true },
       status: 'active'
     };
@@ -7455,13 +7635,13 @@ app.get("/dealer_packages/booster", authenticateToken, async (req, res) => {
     }
 
     // Fetch booster packages
-    const boosterPackages = await DealerPackage.find({ 
+    const boosterPackages = await DealerPackage.find({
       isDeleted: { $ne: true },
       type: 'booster',
       status: 'active'
     })
-    .sort({ dateCreated: -1 })
-    .lean();
+      .sort({ dateCreated: -1 })
+      .lean();
 
     res.json(boosterPackages || []);
 
@@ -7502,17 +7682,17 @@ app.get("/admin/dealer_packages", authenticateToken, async (req, res) => {
 
     // Fetch all packages grouped by type
     const [carPackages, bikePackages, boosterPackages] = await Promise.all([
-      DealerPackage.find({ 
+      DealerPackage.find({
         isDeleted: { $ne: true },
         type: 'car',
         status: 'active'
       }).sort({ dateCreated: -1 }).lean(),
-      DealerPackage.find({ 
+      DealerPackage.find({
         isDeleted: { $ne: true },
         type: 'bike',
         status: 'active'
       }).sort({ dateCreated: -1 }).lean(),
-      DealerPackage.find({ 
+      DealerPackage.find({
         isDeleted: { $ne: true },
         type: 'booster',
         status: 'active'
@@ -7557,13 +7737,13 @@ app.get("/dealer_package_requests", authenticateToken, async (req, res) => {
     }
 
     // Fetch all package requests
-    const requests = await DealerPackageRequest.find({ 
-      isDeleted: { $ne: true } 
+    const requests = await DealerPackageRequest.find({
+      isDeleted: { $ne: true }
     })
-    .populate('userId', 'name email phone')
-    .populate('packageId')
-    .sort({ requestDate: -1 })
-    .lean();
+      .populate('userId', 'name email phone')
+      .populate('packageId')
+      .sort({ requestDate: -1 })
+      .lean();
 
     res.json(requests || []);
 
@@ -7627,7 +7807,7 @@ app.get("/mobile/dealer_packages/:type", async (req, res) => {
 app.get("/dealer_packages/:packageId", async (req, res) => {
   try {
     const { packageId } = req.params;
-    
+
     if (!packageId) {
       return res.status(400).json({ success: false, message: "Package ID required" });
     }
@@ -7638,8 +7818,8 @@ app.get("/dealer_packages/:packageId", async (req, res) => {
     }
 
     const DealerPackage = require('./models/DealerPackage');
-    const package = await DealerPackage.findOne({ 
-      _id: packageId, 
+    const package = await DealerPackage.findOne({
+      _id: packageId,
       status: 'active',
       isDeleted: { $ne: true }
     });
@@ -7700,7 +7880,7 @@ app.get("/mobile/user-mobile-packages/:userId", async (req, res) => {
     const purchases = await MobilePackagePurchase.find(query)
       .sort({ submittedAt: -1 })
       .lean();
-    
+
     const now = new Date();
     const packages = (purchases || []).map(p => {
       // Calculate if package is active (approved and not expired)
@@ -7708,11 +7888,11 @@ app.get("/mobile/user-mobile-packages/:userId", async (req, res) => {
       const isApproved = p.status === 'approved';
       const isPending = p.status === 'pending';
       const isRejected = p.status === 'rejected';
-      
+
       // Determine active status and display status
       let isActive = false;
       let displayStatus = 'pending';
-      
+
       if (isRejected) {
         displayStatus = 'rejected';
       } else if (isPending) {
@@ -7725,7 +7905,7 @@ app.get("/mobile/user-mobile-packages/:userId", async (req, res) => {
           displayStatus = 'active';
         }
       }
-      
+
       return {
         ...p,
         isActive: isActive,
@@ -7733,7 +7913,7 @@ app.get("/mobile/user-mobile-packages/:userId", async (req, res) => {
         active: isActive // For backward compatibility
       };
     });
-    
+
     res.json({ success: true, packages });
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') console.error('Error fetching user mobile packages:', error);
@@ -7754,7 +7934,7 @@ const receiptStorage = multer.diskStorage({
     cb(null, `receipt-${unique}.${ext}`);
   }
 });
-const uploadReceipt = multer({ 
+const uploadReceipt = multer({
   storage: receiptStorage,
   fileFilter: multerImageFilter,
   limits: multerLimits
@@ -7768,7 +7948,7 @@ app.post("/payment/submit-receipt", uploadReceipt, async (req, res) => {
     }
 
     const { userId, packageId, packageName, packageType, amount, customerName, customerEmail, customerPhone, paymentMethod, liveAdDays, validityDays, freeBoosters, totalAds } = req.body;
-    
+
     if (!userId || !packageId || !packageName || !amount) {
       return res.status(400).json({ success: false, message: "Missing required fields" });
     }
@@ -7800,9 +7980,9 @@ app.post("/payment/submit-receipt", uploadReceipt, async (req, res) => {
     });
 
     await purchase.save();
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: "Receipt submitted successfully",
       purchase: {
         id: purchase._id,
@@ -7823,7 +8003,7 @@ app.post("/payment/submit-receipt-json", async (req, res) => {
     }
 
     const { userId, packageId, packageName, packageType, amount, customerName, customerEmail, customerPhone, paymentMethod, liveAdDays, validityDays, freeBoosters, totalAds, receiptImage } = req.body;
-    
+
     if (!userId || !packageId || !packageName || !amount) {
       return res.status(400).json({ success: false, message: "Missing required fields" });
     }
@@ -7834,7 +8014,7 @@ app.post("/payment/submit-receipt-json", async (req, res) => {
       // If it's a valid server path (starts with /uploads/), keep it
       if (receiptImage.startsWith('/uploads/')) {
         processedReceiptImage = receiptImage;
-      } 
+      }
       // If it's a local mobile file path (file:///), replace with placeholder
       else if (receiptImage.startsWith('file://')) {
         processedReceiptImage = 'pending-upload-mobile';
@@ -7865,9 +8045,9 @@ app.post("/payment/submit-receipt-json", async (req, res) => {
     });
 
     await purchase.save();
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: "Receipt submitted successfully (image pending)",
       purchase: {
         id: purchase._id,
@@ -7902,11 +8082,11 @@ app.get("/admin/mobile-package-purchases", authenticateToken, async (req, res) =
     }
 
     // Fetch all mobile package purchases (no populate - userId can be temp_user_xxx, not valid ObjectId)
-    const purchases = await MobilePackagePurchase.find({ 
-      isDeleted: { $ne: true } 
+    const purchases = await MobilePackagePurchase.find({
+      isDeleted: { $ne: true }
     })
-    .sort({ submittedAt: -1 })
-    .lean();
+      .sort({ submittedAt: -1 })
+      .lean();
 
     res.json({
       success: true,
@@ -7946,7 +8126,7 @@ app.post("/dealer_packages", authenticateToken, async (req, res) => {
     }
 
     const packageData = req.body;
-    
+
     // Create new package
     const newPackage = new DealerPackage(packageData);
     await newPackage.save();
@@ -8170,9 +8350,9 @@ app.patch("/dealer_package_requests/:id/status", authenticateToken, async (req, 
       updateData,
       { new: true }
     )
-    .populate('userId', 'name email phone')
-    .populate('packageId')
-    .lean();
+      .populate('userId', 'name email phone')
+      .populate('packageId')
+      .lean();
 
     if (!updatedRequest) {
       return res.status(404).json({
@@ -8231,7 +8411,7 @@ app.patch("/admin/mobile-package-purchases/:id/status", authenticateToken, async
       updateData.approvedAt = new Date();
       updateData.approvedBy = req.userId;
       updateData.isActive = true; // Activate the package
-      
+
       // Calculate expiry date based on validityDays (default 30 days if not set)
       const purchase = await MobilePackagePurchase.findById(id);
       if (purchase) {
@@ -8239,7 +8419,7 @@ app.patch("/admin/mobile-package-purchases/:id/status", authenticateToken, async
         const expiryDate = new Date();
         expiryDate.setDate(expiryDate.getDate() + validityDays);
         updateData.expiryDate = expiryDate;
-        
+
         // Always initialize/reset usage tracking on approval
         updateData.usage = {
           totalAds: purchase.totalAds || 0,
@@ -8250,7 +8430,7 @@ app.patch("/admin/mobile-package-purchases/:id/status", authenticateToken, async
           boostersRemaining: purchase.freeBoosters || 0,
           lastUpdated: new Date()
         };
-        
+
         console.log('✅ Package approved - Usage initialized:', {
           packageId: purchase.packageId,
           totalAds: purchase.totalAds,
@@ -8269,7 +8449,7 @@ app.patch("/admin/mobile-package-purchases/:id/status", authenticateToken, async
       updateData,
       { new: true }
     )
-    .lean();
+      .lean();
 
     if (!updatedPurchase) {
       return res.status(404).json({
@@ -8482,7 +8662,7 @@ const blogStorage = multer.diskStorage({
     cb(null, `blog-${unique}.${ext}`);
   }
 });
-const uploadBlogImage = multer({ 
+const uploadBlogImage = multer({
   storage: blogStorage,
   fileFilter: multerImageFilter,
   limits: multerLimits
@@ -8908,7 +9088,7 @@ const advertisingStorage = multer.diskStorage({
     cb(null, `advertising-${unique}.${ext}`);
   }
 });
-const uploadAdvertisingImage = multer({ 
+const uploadAdvertisingImage = multer({
   storage: advertisingStorage,
   fileFilter: multerImageFilter,
   limits: multerLimits
@@ -9138,7 +9318,7 @@ app.get('/advertising/published', securityMiddleware.sanitizePublicResponse, asy
     }
 
     console.log('🔍 Fetching published advertising...');
-    
+
     // Use Promise.race to enforce timeout even if MongoDB hangs
     const queryPromise = Advertising.find({
       isDeleted: { $ne: true },
@@ -9149,11 +9329,11 @@ app.get('/advertising/published', securityMiddleware.sanitizePublicResponse, asy
       .limit(100) // Limit to prevent huge responses
       .maxTimeMS(20000) // MongoDB query timeout: 20 seconds (reduced)
       .exec();
-    
+
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('Query timeout')), 20000);
     });
-    
+
     let ads = [];
     try {
       ads = await Promise.race([queryPromise, timeoutPromise]);
@@ -9185,13 +9365,13 @@ app.get('/advertising/published', securityMiddleware.sanitizePublicResponse, asy
 // IMPORTANT: This must be LAST route - after all API routes
 app.get('/:filename', (req, res, next) => {
   const filename = req.params.filename;
-  
+
   // Skip if it's a known API route prefix
   const apiRoutePrefixes = ['health', 'admin', 'admin-contact', 'api', 'login', 'signup', 'register', 'inspector', 'inspectors', 'uploads', 'dashboard', 'reports', 'users', 'all_user_ads', 'edit-profile', 'free_ads', 'featured_ads', 'list_it_for_you_ad', 'new_cars', 'bike_ads', 'rent_car', 'autoparts', 'inspection', 'blogs', 'videos', 'buy_car'];
   if (apiRoutePrefixes.some(prefix => req.path.toLowerCase().startsWith('/' + prefix))) {
     return next();
   }
-  
+
   // Only handle image files and common static files
   if (/\.(svg|jpg|jpeg|png|gif|ico|webp)$/i.test(filename)) {
     const filePath = path.join(__dirname, 'uploads', filename);
