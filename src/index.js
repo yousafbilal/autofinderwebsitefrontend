@@ -4,18 +4,21 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { StoreProvider } from './Utils/Store';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { LanguageProvider } from './Context/LanguageContext';
+import { LanguageProvider } from './contexts/LanguageContext';
+import { HelmetProvider } from 'react-helmet-async';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <ThemeProvider>
-      <StoreProvider>
-        <LanguageProvider>
-          <App />
-        </LanguageProvider>
-      </StoreProvider>
-    </ThemeProvider>
+    <HelmetProvider>
+      <ThemeProvider>
+        <StoreProvider>
+          <LanguageProvider>
+            <App />
+          </LanguageProvider>
+        </StoreProvider>
+      </ThemeProvider>
+    </HelmetProvider>
   </React.StrictMode>
 );
 

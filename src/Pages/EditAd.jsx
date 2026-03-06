@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useLanguage } from '../Context/LanguageContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { server_ip } from '../Utils/Data';
+import { fetchWithRetry } from '../Utils/ApiUtils';
 import { toast } from 'react-toastify';
 import { FaTimes, FaChevronDown } from 'react-icons/fa';
 import { carData } from '../Utils/carData';
@@ -450,13 +451,8 @@ function EditAd() {
       let endpointUsed = null;
 
       // Try to fetch from all_ads endpoint first (handles all collections)
-      response = await fetch(`${API_URL}/all_ads/${id}`, {
+      response = await fetchWithRetry(`${API_URL}/all_ads/${id}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors',
-        credentials: 'omit',
       });
 
       // If all_ads fails, try specific endpoints based on common ad types
@@ -464,26 +460,16 @@ function EditAd() {
         console.log('⚠️ all_ads endpoint failed, trying specific endpoints...');
 
         // Try free_ads endpoint
-        response = await fetch(`${API_URL}/free_ads/${id}`, {
+        response = await fetchWithRetry(`${API_URL}/free_ads/${id}`, {
           method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors',
-          credentials: 'omit',
         });
 
         if (response.ok) {
           endpointUsed = 'free_ads';
         } else {
           // Try featured_ads endpoint
-          response = await fetch(`${API_URL}/featured_ads/${id}`, {
+          response = await fetchWithRetry(`${API_URL}/featured_ads/${id}`, {
             method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            mode: 'cors',
-            credentials: 'omit',
           });
 
           if (response.ok) {
@@ -724,11 +710,9 @@ function EditAd() {
         console.log('🔄 Updating ad with images at:', updateEndpoint);
         console.log('📋 Form data keys:', Array.from(formData.keys()));
 
-        const response = await fetch(updateEndpoint, {
+        const response = await fetchWithRetry(updateEndpoint, {
           method: 'PUT',
           body: formData,
-          mode: 'cors',
-          credentials: 'omit',
         });
 
         if (!response.ok) {
@@ -752,14 +736,9 @@ function EditAd() {
       console.log('🔄 Updating ad at:', updateEndpoint);
       console.log('📋 Update data:', updateData);
 
-      const response = await fetch(updateEndpoint, {
+      const response = await fetchWithRetry(updateEndpoint, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(updateData),
-        mode: 'cors',
-        credentials: 'omit',
       });
 
       if (!response.ok) {

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useLanguage } from '../../Context/LanguageContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { FaSun, FaMoon, FaGlobe } from 'react-icons/fa';
 import { server_ip } from '../../Utils/Data';
 // Autofinder Logo
@@ -20,6 +20,7 @@ function Header() {
   const [isNewCarsOpen, setIsNewCarsOpen] = useState(false);
   const [isAutoStoreOpen, setIsAutoStoreOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
   const [user, setUser] = useState(null);
   const location = useLocation();
   const moreDropdownRef = useRef(null);
@@ -30,9 +31,8 @@ function Header() {
   const autoStoreDropdownRef = useRef(null);
   const userMenuRef = useRef(null);
   const userButtonRef = useRef(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
   const [isVisible, setIsVisible] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
+  const lastScrollY = useRef(0);
 
   // Handle smart header scroll behavior
   useEffect(() => {
@@ -40,21 +40,21 @@ function Header() {
       const currentScrollY = window.scrollY;
 
       if (currentScrollY < 10) {
-        setIsVisible(true);
-      } else if (currentScrollY > lastScrollY) {
+        setIsVisible(prev => prev === true ? prev : true);
+      } else if (currentScrollY > lastScrollY.current) {
         // Scrolling down
-        setIsVisible(false);
+        setIsVisible(prev => prev === false ? prev : false);
       } else {
         // Scrolling up
-        setIsVisible(true);
+        setIsVisible(prev => prev === true ? prev : true);
       }
 
-      setLastScrollY(currentScrollY);
+      lastScrollY.current = currentScrollY;
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [lastScrollY]);
+  }, []);
 
   // Check if user is logged in
   useEffect(() => {
@@ -158,7 +158,7 @@ function Header() {
 
 
         {/* Main Header - PakWheels Style */}
-        <header className="bg-white/80 dark:bg-gray-900/80 shadow-sm relative w-full backdrop-blur-md transition-all duration-300">
+        <header className="bg-white dark:bg-gray-900 shadow-sm relative w-full transition-all duration-300">
           <div className="container mx-auto px-2 sm:px-4">
             <nav className="flex items-center justify-between py-0" style={{ minHeight: '30px', maxHeight: '45px' }}>
               {/* Logo Section */}
@@ -738,11 +738,11 @@ function Header() {
               </div>
 
               {/* Post an Ad Button & Dark Mode Toggle */}
-              <div className="hidden md:flex items-center gap-2 lg:gap-4">
+              <div className="hidden md:flex items-center gap-2 ml-auto">
                 {/* Language Switcher */}
                 <button
                   onClick={toggleLanguage}
-                  className="text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-500 transition-colors px-2 py-1 text-xs font-semibold flex items-center gap-1 border-r border-gray-300 dark:border-gray-600 mr-1"
+                  className="text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-500 transition-colors px-1 py-1 text-xs font-semibold flex items-center gap-1 border-r border-gray-300 dark:border-gray-600"
                 >
                   <FaGlobe className="text-xs" />
                   {language === 'en' ? 'اردو' : 'English'}
@@ -878,7 +878,7 @@ function Header() {
                         // Still allow clicking to toggle for mobile/touch
                         toggleUserMenu();
                       }}
-                      className="flex items-center hover:opacity-80 transition-opacity ml-1 py-1"
+                      className="flex items-center hover:opacity-80 transition-opacity py-1"
                     >
                       {getProfileImageUrl() ? (
                         <img

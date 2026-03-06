@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { FaCalculator, FaCar, FaCalendarAlt, FaTachometerAlt, FaMapMarkerAlt, FaDollarSign, FaInfoCircle } from 'react-icons/fa';
 import { carData } from '../Utils/carData';
 

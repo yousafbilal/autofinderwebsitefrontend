@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import { FaChevronDown, FaPlus, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';

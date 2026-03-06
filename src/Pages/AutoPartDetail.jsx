@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { FaCog, FaMapMarkerAlt, FaPhone, FaEnvelope, FaTag, FaShoppingCart, FaArrowLeft } from 'react-icons/fa';
 import { server_ip } from '../Utils/Data';
+import { fetchWithRetry } from '../Utils/ApiUtils';
 
 function AutoPartDetail() {
   const { id } = useParams();
@@ -23,21 +24,15 @@ function AutoPartDetail() {
       try {
         setLoading(true);
         setError(null);
-        
+
         const API_URL = server_ip || 'http://localhost:8001';
         const endpoint = `${API_URL}/autoparts/${id}`;
-        
+
         console.log('🔄 Fetching auto part details for ID:', id);
         console.log('🔗 Endpoint:', endpoint);
-        
-        const response = await fetch(endpoint, {
+
+        const response = await fetchWithRetry(endpoint, {
           method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors',
-          credentials: 'omit',
         });
 
         console.log('📡 Response status:', response.status, response.statusText);
@@ -54,7 +49,7 @@ function AutoPartDetail() {
         }
 
         const partData = await response.json();
-        
+
         if (partData) {
           setPart(partData);
           // Set first image as selected
@@ -88,7 +83,7 @@ function AutoPartDetail() {
       return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23ddd" width="400" height="300"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="14" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E';
     }
     if (imagePath.startsWith('http')) return imagePath;
-    
+
     const API_URL = server_ip || 'http://localhost:8001';
     const cleanPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
     return `${API_URL}/uploads/${cleanPath}`;
@@ -203,7 +198,7 @@ function AutoPartDetail() {
                     }}
                   />
                 </div>
-                
+
                 {/* Thumbnail Images */}
                 {images.length > 1 && (
                   <div className="grid grid-cols-4 gap-2">
@@ -211,9 +206,8 @@ function AutoPartDetail() {
                       <button
                         key={index}
                         onClick={() => setSelectedImage(img)}
-                        className={`border-2 rounded-lg overflow-hidden ${
-                          selectedImage === img ? 'border-red-600 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
-                        }`}
+                        className={`border-2 rounded-lg overflow-hidden ${selectedImage === img ? 'border-red-600 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
+                          }`}
                       >
                         <img
                           src={buildImageUrl(img)}

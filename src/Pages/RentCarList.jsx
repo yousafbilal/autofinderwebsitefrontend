@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { FaCar, FaMapMarkerAlt, FaCog, FaBolt, FaTag } from 'react-icons/fa';
 import { server_ip } from '../Utils/Data';
+import { fetchWithRetry } from '../Utils/ApiUtils';
 
 function RentCarList() {
   const [, setCars] = useState([]); // cars state kept for setCars calls but not used directly
@@ -19,14 +20,8 @@ function RentCarList() {
         const API_URL = server_ip || 'http://localhost:8001';
         const endpoint = `${API_URL}/rent_car`;
 
-        const response = await fetch(endpoint, {
+        const response = await fetchWithRetry(endpoint, {
           method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors',
-          credentials: 'omit',
         });
 
         if (!response.ok) {

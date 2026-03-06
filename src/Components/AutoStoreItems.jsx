@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { FaMapMarkerAlt, FaShoppingCart, FaChevronRight, FaChevronLeft } from 'react-icons/fa';
 import { server_ip } from '../Utils/Data';
-import { useLanguage } from '../Context/LanguageContext';
+import { fetchWithRetry } from '../Utils/ApiUtils';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const AutoStoreItems = () => {
   const { t } = useLanguage();
@@ -24,14 +25,8 @@ const AutoStoreItems = () => {
 
         console.log('🔄 Fetching auto store items from:', endpoint);
 
-        const response = await fetch(endpoint, {
+        const response = await fetchWithRetry(endpoint, {
           method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors',
-          credentials: 'omit',
         });
 
         if (!response.ok) {

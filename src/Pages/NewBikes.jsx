@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { FaCalendarAlt, FaCog, FaBolt, FaStar } from 'react-icons/fa';
 import { server_ip } from '../Utils/Data';
+import { fetchWithRetry } from '../Utils/ApiUtils';
 
 function NewBikes() {
   const [bikes, setBikes] = useState([]);
@@ -20,14 +21,8 @@ function NewBikes() {
 
         console.log('🔄 Fetching new bikes from:', endpoint);
 
-        const response = await fetch(endpoint, {
+        const response = await fetchWithRetry(endpoint, {
           method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors',
-          credentials: 'omit',
         });
 
         if (!response.ok) {

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { FaCar, FaCalendarAlt, FaCog, FaBolt, FaStar, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { server_ip } from '../Utils/Data';
-import { useLanguage } from '../Context/LanguageContext';
+import { fetchWithRetry } from '../Utils/ApiUtils';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const PopularNewCars = () => {
   const { t } = useLanguage();
@@ -30,14 +31,9 @@ const PopularNewCars = () => {
         console.log('🔗 Full endpoint:', endpoint);
         console.log('🔄 Fetching popular new cars from:', endpoint);
 
-        const response = await fetch(endpoint, {
+
+        const response = await fetchWithRetry(endpoint, {
           method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors',
-          credentials: 'omit',
         });
 
         console.log('📡 Response status:', response.status, response.statusText);

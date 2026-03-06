@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { FaMotorcycle, FaMapMarkerAlt, FaCalendarAlt, FaCog, FaBolt, FaPhone, FaStar } from 'react-icons/fa';
 import { server_ip } from '../Utils/Data';
+import { fetchWithRetry } from '../Utils/ApiUtils';
 
 function BikeDetail() {
   const { id } = useParams();
@@ -23,21 +24,15 @@ function BikeDetail() {
       try {
         setLoading(true);
         setError(null);
-        
+
         const API_URL = server_ip || 'http://localhost:8001';
         const endpoint = `${API_URL}/all_ads/${id}`;
-        
+
         console.log('🔄 Fetching bike details for ID:', id);
         console.log('🔗 Endpoint:', endpoint);
-        
-        const response = await fetch(endpoint, {
+
+        const response = await fetchWithRetry(endpoint, {
           method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors',
-          credentials: 'omit',
         });
 
         console.log('📡 Response status:', response.status, response.statusText);
@@ -54,7 +49,7 @@ function BikeDetail() {
         }
 
         const bikeData = await response.json();
-        
+
         if (bikeData) {
           setBike(bikeData);
           if (bikeData.image1) {
@@ -80,28 +75,28 @@ function BikeDetail() {
     if (!imagePath || typeof imagePath !== 'string') {
       return null;
     }
-    
+
     // Skip base64 images
     if (imagePath.startsWith('data:image')) return imagePath;
-    
+
     // Skip local file paths
     if (imagePath.startsWith('file://')) return null;
-    
+
     // Already a full URL - return as is
     if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
       return imagePath;
     }
-    
+
     const API_URL = server_ip || 'http://localhost:8001';
-    
+
     // Remove leading slash if present
     const cleanPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
-    
+
     // Build full URL - ensure /uploads/ is in the path
     if (cleanPath.startsWith('uploads/')) {
       return `${API_URL}/${cleanPath}`;
     }
-    
+
     // Default: prepend /uploads/
     return `${API_URL}/uploads/${cleanPath}`;
   };
@@ -109,13 +104,13 @@ function BikeDetail() {
   // Function to try alternative image URLs
   const tryAlternativeImageUrl = (imagePath) => {
     if (!imagePath || typeof imagePath !== 'string') return null;
-    
+
     // Extract filename from path
     let filename = imagePath;
     if (imagePath.includes('/')) {
       filename = imagePath.split('/').pop();
     }
-    
+
     const API_URL = server_ip || 'http://localhost:8001';
     const serverUrls = [
       API_URL,
@@ -123,7 +118,7 @@ function BikeDetail() {
       'https://backend.autofinder.pk',
       'http://backend.autofinder.pk'
     ];
-    
+
     // Return first alternative URL to try
     for (const baseUrl of serverUrls) {
       const altUrl = `${baseUrl}/uploads/${filename}`;
@@ -131,7 +126,7 @@ function BikeDetail() {
         return altUrl;
       }
     }
-    
+
     return null;
   };
 
@@ -291,9 +286,8 @@ function BikeDetail() {
                     <div
                       key={index}
                       onClick={() => setSelectedImage(img)}
-                      className={`h-20 bg-gray-200 dark:bg-gray-700 rounded cursor-pointer overflow-hidden border-2 ${
-                        selectedImage === img ? 'border-red-600 dark:border-red-500' : 'border-transparent hover:border-gray-400 dark:hover:border-gray-600'
-                      }`}
+                      className={`h-20 bg-gray-200 dark:bg-gray-700 rounded cursor-pointer overflow-hidden border-2 ${selectedImage === img ? 'border-red-600 dark:border-red-500' : 'border-transparent hover:border-gray-400 dark:hover:border-gray-600'
+                        }`}
                     >
                       {img ? (
                         <img
@@ -338,9 +332,9 @@ function BikeDetail() {
                   </span>
                 )}
               </div>
-              
+
               <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-4">{bikeName}</h1>
-              
+
               <div className="mb-6">
                 <span className="text-red-600 dark:text-red-500 font-bold text-4xl">{formatPrice(bike.price)}</span>
               </div>
@@ -420,7 +414,7 @@ function BikeDetail() {
               <p className="text-gray-600 dark:text-gray-400 whitespace-pre-line">{bike.description}</p>
             ) : (
               <p className="text-gray-600 dark:text-gray-400">
-                {bikeName} is available for sale. This bike is in excellent condition and ready for immediate use. 
+                {bikeName} is available for sale. This bike is in excellent condition and ready for immediate use.
                 Contact the seller for more details.
               </p>
             )}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaYoutube } from 'react-icons/fa';
-import { useLanguage } from '../Context/LanguageContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // Channel URL for fallback
 const CHANNEL_URL = 'https://www.youtube.com/@Autofinder-yf8tp';

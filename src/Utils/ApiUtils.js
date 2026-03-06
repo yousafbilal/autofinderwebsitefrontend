@@ -11,16 +11,35 @@
  */
 export const fetchWithRetry = async (url, options = {}, maxRetries = 1) => {
     let lastError;
-    let currentUrl = url;
+    // Intelligently find the token (look for 'token' OR in 'user' object)
+    let token = localStorage.getItem('token');
+    if (!token) {
+        try {
+            const userStr = localStorage.getItem('user');
+            if (userStr) {
+                const user = JSON.parse(userStr);
+                token = user?.token;
+            }
+        } catch (e) {
+            console.warn('⚠️ Failed to parse user object from localStorage:', e.message);
+        }
+    }
 
-    // Ensure options has basic headers if not provided
+    // Standardize headers
+    const headers = {
+        'Accept': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        ...(options.headers || {})
+    };
+
+    // Only add application/json if not already set and NOT FormData
+    if (!headers['Content-Type'] && !(options.body instanceof FormData)) {
+        headers['Content-Type'] = 'application/json';
+    }
+
     const fetchOptions = {
         ...options,
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            ...(options.headers || {})
-        },
+        headers,
         mode: 'cors',
         credentials: 'omit',
     };

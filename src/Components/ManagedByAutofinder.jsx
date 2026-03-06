@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { FaCar, FaMapMarkerAlt, FaCalendarAlt, FaCog, FaBolt, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { server_ip } from '../Utils/Data';
-import { useLanguage } from '../Context/LanguageContext';
+import { fetchWithRetry } from '../Utils/ApiUtils';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const ManagedByAutofinder = () => {
   const { t } = useLanguage();
@@ -27,21 +28,15 @@ const ManagedByAutofinder = () => {
 
         // API URL - use localhost backend (from Data.jsx or default)
         const API_URL = server_ip || 'http://localhost:8001';
-        const endpoint = `${API_URL}/list_it_for_you_ad`;
+        const endpoint = `${API_URL}/list_it_for_you_ad/public`;
 
         console.log('🔗 Using API URL:', API_URL);
         console.log('🔗 Full endpoint:', endpoint);
 
         console.log('🔄 Fetching managed ads from:', endpoint);
 
-        const response = await fetch(endpoint, {
+        const response = await fetchWithRetry(endpoint, {
           method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors', // Enable CORS
-          credentials: 'omit', // Don't send credentials to prevent CORB issues
         });
 
         console.log('📡 Response status:', response.status, response.statusText);

@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { toast } from 'react-toastify';
 import Header from './include/Header';
 import Footer from './include/Footer';
 import { server_ip } from '../Utils/Data';
-import { useLanguage } from '../Context/LanguageContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // Detect attachment once outside component to avoid re-render on every keystroke
 const bgAttachment = window.innerWidth > 768 ? 'fixed' : 'scroll';

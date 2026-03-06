@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { toast } from 'react-toastify';
 import { server_ip, ContactInfo } from '../Utils/Data';
-import { useLanguage } from '../Context/LanguageContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 function Contact() {
   const { t } = useLanguage();

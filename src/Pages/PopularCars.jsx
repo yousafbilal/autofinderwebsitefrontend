@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { FaCar, FaCalendarAlt, FaCog, FaBolt, FaStar, FaChevronDown, FaChevronUp, FaMapMarkerAlt } from 'react-icons/fa';
 import PriceRangeDropdown from '../Components/PriceRangeDropdown';
 import MileageRangeDropdown from '../Components/MileageRangeDropdown';
 import VoiceSearchComp from '../Components/VoiceSearch';
 import { server_ip } from '../Utils/Data';
-import { useLanguage } from '../Context/LanguageContext';
+import { fetchWithRetry } from '../Utils/ApiUtils';
+import { useLanguage } from '../contexts/LanguageContext';
 
 function PopularCars() {
   const { t } = useLanguage();
@@ -125,14 +126,8 @@ function PopularCars() {
 
         console.log('🔄 Fetching popular cars from:', endpoint);
 
-        const response = await fetch(endpoint, {
+        const response = await fetchWithRetry(endpoint, {
           method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors',
-          credentials: 'omit',
         });
 
         if (!response.ok) {

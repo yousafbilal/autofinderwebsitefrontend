@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FaTimes, FaChevronDown } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { server_ip } from '../Utils/Data';
+import { fetchWithRetry } from '../Utils/ApiUtils';
 import { carData } from '../Utils/carData';
-import { useLanguage } from '../Context/LanguageContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // Searchable City Select Component
 const SearchableCitySelect = ({ value, onChange, name, required = false, placeholder }) => {
@@ -1127,11 +1128,9 @@ function SellCar() {
 
       console.log('🔄 Submitting list it for you ad...');
 
-      const response = await fetch(`${API_URL}/list_it_for_you_ad`, {
+      const response = await fetchWithRetry(`${API_URL}/list_it_for_you_ad`, {
         method: 'POST',
         body: formData,
-        mode: 'cors',
-        credentials: 'omit',
       });
 
       if (!response.ok) {
@@ -1234,13 +1233,8 @@ function SellCar() {
     console.log('🔍 Checking free ad limit before submission...');
     try {
       const API_URL = server_ip || 'http://localhost:8001';
-      const limitCheckResponse = await fetch(`${API_URL}/user-pricing/${userId}`, {
+      const limitCheckResponse = await fetchWithRetry(`${API_URL}/user-pricing/${userId}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors',
-        credentials: 'omit',
       });
 
       console.log('📡 Limit check response status:', limitCheckResponse.status);
@@ -1324,11 +1318,9 @@ function SellCar() {
 
       console.log('🔄 Submitting free car ad...');
 
-      const response = await fetch(`${API_URL}/free_ads`, {
+      const response = await fetchWithRetry(`${API_URL}/free_ads`, {
         method: 'POST',
         body: formData,
-        mode: 'cors',
-        credentials: 'omit',
       });
 
       if (!response.ok) {
@@ -1450,13 +1442,8 @@ function SellCar() {
         console.log('🔄 Network/fetch error detected - checking free ad limit as fallback...');
         try {
           const API_URL = server_ip || 'http://localhost:8001';
-          const limitCheckResponse = await fetch(`${API_URL}/user-pricing/${userId}`, {
+          const limitCheckResponse = await fetchWithRetry(`${API_URL}/user-pricing/${userId}`, {
             method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            mode: 'cors',
-            credentials: 'omit',
           });
 
           if (limitCheckResponse.ok) {
@@ -1571,13 +1558,8 @@ function SellCar() {
     setCheckingFreeAdLimit(true);
     try {
       const API_URL = server_ip || 'http://localhost:8001';
-      const response = await fetch(`${API_URL}/user-pricing/${userId}`, {
+      const response = await fetchWithRetry(`${API_URL}/user-pricing/${userId}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors',
-        credentials: 'omit',
       });
 
       if (response.ok) {
@@ -1673,11 +1655,9 @@ function SellCar() {
       console.log('💰 Payment amount: 525');
       console.log('📄 Payment receipt:', paymentReceipt525.name);
 
-      const response = await fetch(`${API_URL}/free_ads`, {
+      const response = await fetchWithRetry(`${API_URL}/free_ads`, {
         method: 'POST',
         body: formData,
-        mode: 'cors',
-        credentials: 'omit',
       });
 
       if (!response.ok) {

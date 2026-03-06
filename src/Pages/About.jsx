@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
-import { Helmet } from 'react-helmet';
-import { useLanguage } from '../Context/LanguageContext';
+import { Helmet } from 'react-helmet-async';
+import { useLanguage } from '../contexts/LanguageContext';
 
 function About() {
   const { t } = useLanguage();

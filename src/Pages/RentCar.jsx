@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FaChevronDown, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { server_ip } from '../Utils/Data';
+import { fetchWithRetry } from '../Utils/ApiUtils';
 import { carData } from '../Utils/carData';
 import { pakistaniCities } from '../Utils/pakistaniCities';
 
@@ -648,7 +649,7 @@ function RentCar() {
 
       let response;
       try {
-        response = await fetch(`${API_URL}/rent_car`, {
+        response = await fetchWithRetry(`${API_URL}/rent_car`, {
           method: 'POST',
           body: formData,
           signal: controller.signal,

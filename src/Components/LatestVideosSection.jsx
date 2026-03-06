@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { server_ip } from '../Utils/Data';
+import { fetchWithRetry } from '../Utils/ApiUtils';
 import { FaPlayCircle } from 'react-icons/fa';
 
 const LatestVideosSection = () => {
@@ -15,14 +16,8 @@ const LatestVideosSection = () => {
         const API_URL = server_ip || 'http://localhost:8001';
         const endpoint = `${API_URL}/videos`;
 
-        const response = await fetch(endpoint, {
+        const response = await fetchWithRetry(endpoint, {
           method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors',
-          credentials: 'omit',
         });
 
         if (!response.ok) {

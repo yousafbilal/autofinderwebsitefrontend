@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import { FaUpload, FaMapMarkerAlt, FaTag, FaDollarSign, FaFileAlt, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { server_ip } from '../Utils/Data';
+import { fetchWithRetry } from '../Utils/ApiUtils';
 
 function SellCarParts() {
   const navigate = useNavigate();
@@ -134,11 +135,9 @@ function SellCarParts() {
         imagesCount: images.length
       });
 
-      const response = await fetch(endpoint, {
+      const response = await fetchWithRetry(endpoint, {
         method: 'POST',
         body: formDataToSend,
-        mode: 'cors',
-        credentials: 'omit',
       });
 
       if (!response.ok) {

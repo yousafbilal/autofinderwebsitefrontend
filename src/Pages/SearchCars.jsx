@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { FaCar, FaCalendarAlt, FaCog, FaBolt, FaChevronDown, FaChevronUp, FaMapMarkerAlt, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import PriceRangeDropdown from '../Components/PriceRangeDropdown';
@@ -7,7 +7,7 @@ import MileageRangeDropdown from '../Components/MileageRangeDropdown';
 import VoiceSearchComp from '../Components/VoiceSearch';
 import { server_ip } from '../Utils/Data';
 import { fetchWithRetry } from '../Utils/ApiUtils';
-import { useLanguage } from '../Context/LanguageContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 function SearchCars() {
   const { t } = useLanguage();

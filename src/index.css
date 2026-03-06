@@ -11,7 +11,21 @@ body {
   -moz-osx-font-smoothing: grayscale;
   scroll-snap-type: y mandatory;
   scroll-behavior: smooth;
-  scroll-padding-top: 120px;
+  scroll-padding-top: 100px;
+}
+
+/* Interactive Button Smoothing: Provides Micro-microseconds response feel */
+button:active,
+a:active,
+.active-scale:active {
+  transform: scale(0.96);
+  opacity: 0.9;
+  transition: transform 0.05s ease;
+}
+
+button,
+a {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @media (min-width: 640px) {

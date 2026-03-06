@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { toast } from 'react-toastify';
 import Header from './include/Header';
 import Footer from './include/Footer';
 import { server_ip } from '../Utils/Data';
-import { useLanguage } from '../Context/LanguageContext';
+import { useLanguage } from '../contexts/LanguageContext';
+import { fetchWithRetry } from '../Utils/ApiUtils';
 
 function SignIn() {
   const { t } = useLanguage();
@@ -43,7 +44,7 @@ function SignIn() {
 
     try {
       const API_URL = server_ip || 'http://localhost:8001';
-      const response = await fetch(`${API_URL}/login`, {
+      const response = await fetchWithRetry(`${API_URL}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -52,8 +53,6 @@ function SignIn() {
           emailOrPhone: formData.emailOrPhone,
           password: formData.password
         }),
-        mode: 'cors',
-        credentials: 'omit',
       });
 
       const data = await response.json();
@@ -86,6 +85,7 @@ function SignIn() {
         }
 
         localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('token', data.token);
 
         // Show success toast
         toast.success(t('loginSuccessful'));

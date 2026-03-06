@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { toast } from 'react-toastify';
 import { server_ip } from '../Utils/Data';
 import { FaCar, FaMotorcycle, FaRocket, FaCheckCircle } from 'react-icons/fa';

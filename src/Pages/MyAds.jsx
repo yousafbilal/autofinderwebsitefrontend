@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { useNavigate, Link } from 'react-router-dom';
-import { useLanguage } from '../Context/LanguageContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { server_ip } from '../Utils/Data';
+import { fetchWithRetry } from '../Utils/ApiUtils';
 import { toast } from 'react-toastify';
 
 // Component to handle ad image with error handling
@@ -154,35 +155,6 @@ function MyAds() {
       // FORCE 8001 - Standardize for connectivity
       const API_URL = server_ip;
       console.log(`📡 [FORCED FIX] Fetching user ads from: ${API_URL}`);
-
-      const fetchWithRetry = async (url, options = {}) => {
-        try {
-          const res = await fetch(url, {
-            ...options,
-            headers: {
-              ...options.headers,
-              'Content-Type': 'application/json'
-            },
-            mode: 'cors',
-            credentials: 'omit',
-          });
-          return res;
-        } catch (err) {
-          console.warn(`⚠️ Retrying fetch for ${url} (localhost fallback)`);
-          const fallbackUrl = url.includes('127.0.0.1')
-            ? url.replace('127.0.0.1', 'localhost')
-            : url.replace('localhost', '127.0.0.1');
-          return fetch(fallbackUrl, {
-            ...options,
-            headers: {
-              ...options.headers,
-              'Content-Type': 'application/json'
-            },
-            mode: 'cors',
-            credentials: 'omit',
-          });
-        }
-      };
 
       const response = await fetchWithRetry(`${API_URL}/all_user_ads/${userId}`);
 
@@ -586,34 +558,7 @@ function MyAds() {
       const API_URL = server_ip;
       console.log(`📡 [FORCED FIX] Deleting ad from: ${API_URL}`);
 
-      const fetchWithRetry = async (url, options = {}) => {
-        try {
-          const res = await fetch(url, {
-            ...options,
-            headers: {
-              ...options.headers,
-              'Content-Type': 'application/json'
-            },
-            mode: 'cors',
-            credentials: 'omit',
-          });
-          return res;
-        } catch (err) {
-          console.warn(`⚠️ Retrying fetch for ${url} (localhost fallback)`);
-          const fallbackUrl = url.includes('127.0.0.1')
-            ? url.replace('127.0.0.1', 'localhost')
-            : url.replace('localhost', '127.0.0.1');
-          return fetch(fallbackUrl, {
-            ...options,
-            headers: {
-              ...options.headers,
-              'Content-Type': 'application/json'
-            },
-            mode: 'cors',
-            credentials: 'omit',
-          });
-        }
-      };
+      // Using imported fetchWithRetry instead of local definition
 
       // Determine the correct endpoint based on ad type
       let deleteEndpoint = '';

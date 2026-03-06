@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { server_ip } from '../Utils/Data';
+import { fetchWithRetry } from '../Utils/ApiUtils';
 import { toast } from 'react-toastify';
 import { FaCar, FaMotorcycle, FaRocket } from 'react-icons/fa';
 
@@ -21,7 +22,7 @@ function MyPackages() {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Get user from localStorage
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
       const userId = userData.userId || userData._id;
@@ -34,12 +35,16 @@ function MyPackages() {
 
       const API_URL = server_ip || 'http://localhost:8001';
       const timestamp = new Date().getTime();
-      
+
+
       // Fetch all packages including pending
-      const response = await fetch(`${API_URL}/mobile/user-mobile-packages/${userId}?includePending=true&_t=${timestamp}`);
-      
+      const endpoint = `${API_URL}/mobile/user-mobile-packages/${userId}?includePending=true&_t=${timestamp}`;
+      const response = await fetchWithRetry(endpoint, {
+        method: 'GET',
+      });
+
       let allPackages = [];
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success && Array.isArray(data.packages)) {
@@ -49,10 +54,10 @@ function MyPackages() {
 
       console.log('📦 User packages response:', allPackages);
       console.log('📦 Total packages received:', allPackages.length);
-      console.log('📦 Package statuses:', allPackages.map(p => ({ 
-        name: p.package?.name || p.purchase?.packageName, 
+      console.log('📦 Package statuses:', allPackages.map(p => ({
+        name: p.package?.name || p.purchase?.packageName,
         status: p.purchase?.status || 'unknown',
-        isActive: p.isActive 
+        isActive: p.isActive
       })));
 
       if (allPackages.length > 0) {
@@ -194,11 +199,10 @@ function MyPackages() {
           <div className="flex justify-center mb-6 border-b border-gray-200 dark:border-gray-700">
             <button
               onClick={() => setActiveTab('active')}
-              className={`px-6 py-3 font-semibold transition-colors relative ${
-                activeTab === 'active'
-                  ? 'text-red-600 dark:text-red-400'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
-              }`}
+              className={`px-6 py-3 font-semibold transition-colors relative ${activeTab === 'active'
+                ? 'text-red-600 dark:text-red-400'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                }`}
             >
               Active ({activeCount})
               {activeTab === 'active' && (
@@ -207,11 +211,10 @@ function MyPackages() {
             </button>
             <button
               onClick={() => setActiveTab('pending')}
-              className={`px-6 py-3 font-semibold transition-colors relative ${
-                activeTab === 'pending'
-                  ? 'text-red-600 dark:text-red-400'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
-              }`}
+              className={`px-6 py-3 font-semibold transition-colors relative ${activeTab === 'pending'
+                ? 'text-red-600 dark:text-red-400'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                }`}
             >
               Pending ({pendingCount})
               {activeTab === 'pending' && (
@@ -220,11 +223,10 @@ function MyPackages() {
             </button>
             <button
               onClick={() => setActiveTab('expired')}
-              className={`px-6 py-3 font-semibold transition-colors relative ${
-                activeTab === 'expired'
-                  ? 'text-red-600 dark:text-red-400'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
-              }`}
+              className={`px-6 py-3 font-semibold transition-colors relative ${activeTab === 'expired'
+                ? 'text-red-600 dark:text-red-400'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                }`}
             >
               Expired ({expiredCount})
               {activeTab === 'expired' && (
@@ -304,8 +306,8 @@ function MyPackages() {
                           {pkg.daysRemaining === 0
                             ? 'Expires today!'
                             : pkg.daysRemaining === 1
-                            ? 'Expires tomorrow!'
-                            : `Expires in ${pkg.daysRemaining} days`}
+                              ? 'Expires tomorrow!'
+                              : `Expires in ${pkg.daysRemaining} days`}
                         </span>
                       </div>
                     ) : (
@@ -420,7 +422,7 @@ function MyPackages() {
                             Buy Again
                           </button>
                         ) : null}
-                        
+
                         {/* Post New Ad Button for Active Packages */}
                         {pkg.status === 'active' && pkg.isActive && pkg.adsRemaining > 0 && (
                           <>
@@ -429,13 +431,13 @@ function MyPackages() {
                               <div className="space-y-2">
                                 <button
                                   onClick={() => {
-                                    navigate('/sell-car', { 
-                                      state: { 
+                                    navigate('/sell-car', {
+                                      state: {
                                         dealerPackageId: pkg.packageId,
                                         purchaseId: pkg.id,
                                         skipPayment: true,
                                         service: 'premium'
-                                      } 
+                                      }
                                     });
                                   }}
                                   className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
@@ -445,12 +447,12 @@ function MyPackages() {
                                 </button>
                                 <button
                                   onClick={() => {
-                                    navigate('/sell-bike', { 
-                                      state: { 
+                                    navigate('/sell-bike', {
+                                      state: {
                                         dealerPackageId: pkg.packageId,
                                         purchaseId: pkg.id,
                                         skipPayment: true
-                                      } 
+                                      }
                                     });
                                   }}
                                   className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
@@ -460,12 +462,12 @@ function MyPackages() {
                                 </button>
                                 <button
                                   onClick={() => {
-                                    navigate('/post-rent-car', { 
-                                      state: { 
+                                    navigate('/post-rent-car', {
+                                      state: {
                                         dealerPackageId: pkg.packageId,
                                         purchaseId: pkg.id,
                                         skipPayment: true
-                                      } 
+                                      }
                                     });
                                   }}
                                   className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
@@ -502,16 +504,16 @@ function MyPackages() {
                             )}
                           </>
                         )}
-                        
+
                         {/* Boost Ad Button for Active Packages with Boosters */}
                         {pkg.status === 'active' && pkg.isActive && pkg.boostersRemaining > 0 && (
                           <button
                             onClick={() => {
-                              navigate('/boost-ad', { 
-                                state: { 
+                              navigate('/boost-ad', {
+                                state: {
                                   packageId: pkg.packageId,
                                   purchaseId: pkg.id
-                                } 
+                                }
                               });
                             }}
                             className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"

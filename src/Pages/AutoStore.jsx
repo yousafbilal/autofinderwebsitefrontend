@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { FaCog, FaMapMarkerAlt, FaChevronDown, FaChevronUp, FaSearch } from 'react-icons/fa';
 import VoiceSearchComp from '../Components/VoiceSearch';
 import { server_ip } from '../Utils/Data';
 import { fetchWithRetry } from '../Utils/ApiUtils';
-import { useLanguage } from '../Context/LanguageContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 function AutoStore() {
   const { t } = useLanguage();

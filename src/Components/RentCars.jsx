@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { FaCar, FaMapMarkerAlt, FaCalendarAlt, FaCog, FaBolt, FaTag, FaChevronRight, FaChevronLeft } from 'react-icons/fa';
 import { server_ip } from '../Utils/Data';
-import { useLanguage } from '../Context/LanguageContext';
+import { fetchWithRetry } from '../Utils/ApiUtils';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const RentCars = () => {
   const { t } = useLanguage();
@@ -24,14 +25,8 @@ const RentCars = () => {
 
         console.log('🔄 Fetching rent cars from:', endpoint);
 
-        const response = await fetch(endpoint, {
+        const response = await fetchWithRetry(endpoint, {
           method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors',
-          credentials: 'omit',
         });
 
         if (!response.ok) {

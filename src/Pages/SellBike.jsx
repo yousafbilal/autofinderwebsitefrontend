@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FaTimes, FaChevronDown } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { server_ip } from '../Utils/Data';
+import { fetchWithRetry } from '../Utils/ApiUtils';
 import { bikeData } from '../Utils/bikeData';
 
 // Searchable Bike Make Select Component
@@ -621,11 +622,9 @@ function SellBike() {
 
       console.log('🔄 Submitting premium bike ad...');
 
-      const response = await fetch(`${API_URL}/bike_ads`, {
+      const response = await fetchWithRetry(`${API_URL}/bike_ads`, {
         method: 'POST',
         body: formData,
-        mode: 'cors',
-        credentials: 'omit',
       });
 
       if (!response.ok) {
@@ -782,11 +781,9 @@ function SellBike() {
 
       console.log('🔄 Submitting free bike ad...');
 
-      const response = await fetch(`${API_URL}/bike_ads`, {
+      const response = await fetchWithRetry(`${API_URL}/bike_ads`, {
         method: 'POST',
         body: formData,
-        mode: 'cors',
-        credentials: 'omit',
       });
 
       if (!response.ok) {

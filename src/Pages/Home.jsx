@@ -1,9 +1,9 @@
 import CinematicView from "../Components/Cinematic/CinematicView";
 import React, { useState, useEffect } from "react";
-import { useLanguage } from '../Context/LanguageContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { toast } from "react-toastify";
 import { analyzeVoiceCommand } from "../Utils/VoiceNavigationLogic";
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet-async";
 import { Link, useNavigate } from "react-router-dom";
 import {
   FaCar,
@@ -115,30 +115,30 @@ const BrandLogo = ({
 };
 
 // 3D Flip Card Component for Autofinder Services
-const ServiceFlipCard = ({ front, back, onClick }) => {
-  const [rotate, setRotate] = useState({ x: 0, y: 0 });
-  const [isHovered, setIsHovered] = useState(false);
+const ServiceFlipCard = React.memo(({ front, back, onClick }) => {
+  const [rotate, setRotate] = React.useState({ x: 0, y: 0 });
+  const [isHovered, setIsHovered] = React.useState(false);
 
-  const handleMouseMove = (e) => {
+  const handleMouseMove = React.useCallback((e) => {
     const card = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - card.left;
     const y = e.clientY - card.top;
     const centerX = card.width / 2;
     const centerY = card.height / 2;
-    const rotateX = (centerY - y) / 8; // More pronounced rotation
+    const rotateX = (centerY - y) / 8;
     const rotateY = (x - centerX) / 8;
 
     setRotate({ x: rotateX, y: rotateY });
-  };
+  }, []);
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = React.useCallback(() => {
     setRotate({ x: 0, y: 0 });
     setIsHovered(false);
-  };
+  }, []);
 
   return (
     <div
-      className="group relative h-30 sm:h-36 w-full cursor-pointer"
+      className="group relative h-30 sm:h-36 w-full cursor-pointer transition-transform active:scale-95"
       onClick={onClick}
       onMouseMove={handleMouseMove}
       onMouseEnter={() => setIsHovered(true)}
@@ -155,7 +155,6 @@ const ServiceFlipCard = ({ front, back, onClick }) => {
             : `rotateX(${rotate.x}deg) rotateY(${rotate.y}deg)`,
         }}
       >
-        {/* Front Side */}
         <div
           className="absolute inset-0 bg-white border border-gray-100 flex flex-col items-center justify-center p-1.5 gap-1 shadow-sm"
           style={{
@@ -169,7 +168,6 @@ const ServiceFlipCard = ({ front, back, onClick }) => {
           {front}
         </div>
 
-        {/* Back Side */}
         <div
           className="absolute inset-0 bg-[#b91c1c] text-white flex flex-col items-center justify-center p-3 text-center shadow-2xl"
           style={{
@@ -185,7 +183,7 @@ const ServiceFlipCard = ({ front, back, onClick }) => {
       </div>
     </div>
   );
-};
+});
 
 function Home() {
   const { t } = useLanguage();

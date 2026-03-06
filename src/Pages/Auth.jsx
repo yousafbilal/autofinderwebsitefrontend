@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { toast } from 'react-toastify';
+import { fetchWithRetry } from '../Utils/ApiUtils';
 import Header from './include/Header';
 import Footer from './include/Footer';
 import { server_ip } from '../Utils/Data';
@@ -146,6 +147,7 @@ function Auth() {
                     userType: data.userType,
                 };
                 localStorage.setItem('user', JSON.stringify(userData));
+                localStorage.setItem('token', data.token); // Explicit token for simpler retrieval
                 toast.success('Login successful!');
                 setTimeout(() => { navigate('/'); window.location.reload(); }, 800);
             } else {
@@ -187,6 +189,7 @@ function Auth() {
                     userType: data.userType,
                 };
                 localStorage.setItem('user', JSON.stringify(userData));
+                localStorage.setItem('token', data.token);
                 toast.success('Verified! Logging you in...');
                 setTimeout(() => { navigate('/'); window.location.reload(); }, 800);
             } else {
@@ -254,31 +257,14 @@ function Auth() {
                 };
 
                 console.log(`📡 [FETCH] Attempting POST to: ${API_URL}/signup`);
-                response = await fetch(`${API_URL}/signup`, {
+                response = await fetchWithRetry(`${API_URL}/signup`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
             } catch (fetchErr) {
-                console.warn('⚠️ Primary fetch failed:', fetchErr.message);
-                // Fallback: If primary failed, try the other common address
-                const fallbackUrl = API_URL.includes('localhost')
-                    ? API_URL.replace('localhost', '127.0.0.1')
-                    : API_URL.replace('127.0.0.1', 'localhost');
-
-                console.log(`🔄 [RETRY] Attempting fallback: ${fallbackUrl}/signup`);
-                response = await fetch(`${fallbackUrl}/signup`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name: signUpData.name,
-                        email: signUpData.email,
-                        phone: signUpData.phone,
-                        password: signUpData.password,
-                        confirmPassword: signUpData.confirmPassword,
-                        userType: 'User'
-                    })
-                });
+                console.error('❌ Signup failed:', fetchErr.message);
+                throw fetchErr;
             }
 
             console.log(`📥 [SIGNUP] Response status: ${response.status}`);
@@ -305,6 +291,7 @@ function Auth() {
                         userType: data.userType,
                     };
                     localStorage.setItem('user', JSON.stringify(userData));
+                    localStorage.setItem('token', data.token);
                     toast.success('Account created! Welcome to AutoFinder!');
                     setTimeout(() => { navigate('/'); window.location.reload(); }, 800);
                 } else {
@@ -351,6 +338,7 @@ function Auth() {
                     userType: data.userType,
                 };
                 localStorage.setItem('user', JSON.stringify(userData));
+                localStorage.setItem('token', data.token);
                 toast.success('Account verified! Welcome to AutoFinder!');
                 setTimeout(() => { navigate('/'); window.location.reload(); }, 800);
             } else {
